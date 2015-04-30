@@ -4,7 +4,7 @@
 #                                                                             #
 ###############################################################################
 
-import urllib2,re,subprocess
+import urllib2,re,subprocess,requests
 
 class ConnectivityError(Exception):
     pass
@@ -87,23 +87,15 @@ class blaster():
         elif self.status == True:
             text = ncbiGet(self.rid, ALIGNMENTS='0', DESCRIPTIONS='{}'.format(self.numhits), FORMAT_TYPE='Text')
             self.uids = [i.split('|')[1] for i in text.split('\n') if '|' in i and len(i.split('|')) == 3]
-            self.fetch_seqs()
+            self.uids = [i for i in self.uids if len(i)>3]#Shameful hack ... TODO Fix later
+            self.fetch_sequences()
         else:
             raise TypeError('The type of blaster.status must be True,False, or None. Current type is: {}'.format(type(self.status)))
 
     def fetch_sequences(self):
         if self.uids is not None:
             fasta= efetch(self.uids) #flat text fasta format is the default for efetch
-            headers,seqs = zip(*(('>'+i.split('\n')[0], ''.join(i.split('\n')[1:])) for i in fasta.split('>')))
-            self.headers,self.seqs = headers,seqs
-
-    def target_hit_pairwise_alignment():
-        pass #TODO -- import alignment & registration functions from coupling_paper directory
-
-    def fetch_seqs(self):
-        hits = self.get_hitlist()
-        uids = [i.split('|')[1] for i in hits]
-        fasta= efetch(gids)
+            self.headers,self.seqs = zip(*(('>'+i.split('\n')[0], ''.join(i.split('\n')[1:])) for i in fasta.split('>')[1:]))
 
     def make_pairwise_alignments(self):
         self.alignments = [smith_waterman(self.seq, i) for i in self.seqs]
@@ -244,13 +236,10 @@ def efetch(uids, **kw):
     kw['db'] = kw.get('db', 'protein')
     kw['rettype'] = kw.get('rettype', 'fasta')
     kw['retmode'] = kw.get('retmode', 'text')
-    kw  = '&'.join(['{}={}'.format(k,v)  for k,v in kw.items()])
-    BaseURL = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + kw
-    data = ''
-    for start in range(0, len(uids), 200):
-        URL = urllib2.urlopen(BaseURL + "&id={}".format(','.join(uids[start:start+200])))
-        data= data + URL.read()
-    return data
+    kw['id'] = ','.join(uids)
+    BaseURL = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi" 
+    r = requests.post(BaseURL, data=kw)
+    return r.text
 
 class smith_waterman():
     def __init__(self, seq1, seq2):
