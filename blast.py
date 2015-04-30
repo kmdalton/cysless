@@ -4,14 +4,16 @@
 #                                                                             #
 ###############################################################################
 
-from time import sleep
-import urllib2,re
+import urllib2,re,subprocess
 
 class ConnectivityError(Exception):
     pass
 
 class blaster():
     def __init__(self, seq = None):
+        """
+        var = blaster(seq) --> blaster object
+        """
         if seq is None:
             self.seq = ''
         else:
@@ -21,8 +23,19 @@ class blaster():
         self.numhits= None
         self.headers= None
         self.seqs   = None
+        self.uids   = None
+        #self.blast_request()
 
     def blast_request(self, **kw):
+        """
+        blaster.blast_request(**kwargs)
+            kwargs:
+                HITLIST_SIZE (str|int): max number of seqs to ask blast for, default 3000
+                DATABASE (str): which blast database to search, default nr
+                PROGRAM (str): which blast program to use, default blastp
+            returns:
+                nothing. but it sets self.numhits, self.rid
+        """
         #Make sure default list of parameters is populated
         kw['HITLIST_SIZE'] = str(kw.get('HITLIST_SIZE', 3000))
         kw['DATABASE'] = kw.get('DATABASE', 'nr')
@@ -34,6 +47,12 @@ class blaster():
         self.numhits = int(kw['HITLIST_SIZE'])
 
     def check_status(self):
+        """
+        blaster.check_status()
+            query the ncbi database to check the status of self.rid which is the ncbi server
+            request id for the blast search initiated by self.blast_request
+            returns True if the blast search is complete, False otherwise, and None if self.rid is unset
+        """
         if self.rid is None:
             return None
         else:
@@ -47,6 +66,10 @@ class blaster():
                 return True
 
     def update_status(self):
+        """
+        blaster.update_status()
+            query the qblast server with request id, self.rid
+        """
         status = self.check_status()
         if status is None:
             self.status = None
@@ -63,12 +86,16 @@ class blaster():
             return None,None
         elif self.status == True:
             text = ncbiGet(self.rid, ALIGNMENTS='0', DESCRIPTIONS='{}'.format(self.numhits), FORMAT_TYPE='Text')
-            uids = [i.split('|')[1] for i in text.split('\n') if '|' in i and len(i.split('|')) == 3]
-            fasta= efetch(uids) #flat text fasta format is the default for efetch
-            headers,seqs = zip(*(('>'+i.split('\n')[0], ''.join(i.split('\n')[1:])) for i in fasta.split('>')))
-            self.headers,self.seqs = headers,seqs
+            self.uids = [i.split('|')[1] for i in text.split('\n') if '|' in i and len(i.split('|')) == 3]
+            self.fetch_seqs()
         else:
             raise TypeError('The type of blaster.status must be True,False, or None. Current type is: {}'.format(type(self.status)))
+
+    def fetch_sequences(self):
+        if self.uids is not None:
+            fasta= efetch(self.uids) #flat text fasta format is the default for efetch
+            headers,seqs = zip(*(('>'+i.split('\n')[0], ''.join(i.split('\n')[1:])) for i in fasta.split('>')))
+            self.headers,self.seqs = headers,seqs
 
     def target_hit_pairwise_alignment():
         pass #TODO -- import alignment & registration functions from coupling_paper directory
@@ -77,6 +104,9 @@ class blaster():
         hits = self.get_hitlist()
         uids = [i.split('|')[1] for i in hits]
         fasta= efetch(gids)
+
+    def make_pairwise_alignments(self):
+        self.alignments = [smith_waterman(self.seq, i) for i in self.seqs]
 
     def __exit__(self):
         if self.rid != None:
@@ -221,4 +251,36 @@ def efetch(uids, **kw):
         URL = urllib2.urlopen(BaseURL + "&id={}".format(','.join(uids[start:start+200])))
         data= data + URL.read()
     return data
-    
+
+class smith_waterman():
+    def __init__(self, seq1, seq2):
+        self.seq1,self.seq2 = seq1,seq2
+        self.aln,self.identity,self.similarity = None,None,None
+        self.registered_seq2 = None
+        self.align()
+
+    def align(self):
+        self.aln = subprocess.Popen(
+                ["/bin/bash",
+                    "-cs", 
+                    "water <(echo %s) <(echo %s) stdout -gapopen=10 -gapextend=0.5 2>/dev/null" %(self.seq1, self.seq2)
+                    ],
+                stdout=subprocess.PIPE
+            ).communicate()[0]
+        self.similarity = float(re.findall(r'Similarity:.*\n', self.aln)[0].split()[-1].strip('%()'))
+        self.identity   = float(re.findall(r'Identity:.*\n', self.aln)[0].split()[-1].strip('%()'))
+
+        #This whole block just registers the second seq with the first so we can examine the snps later
+        lines = (i for i in self.aln.split('\n') if len(i)>0 and i[0]!='#')
+        S = ""
+        for line1 in lines:
+            lines.next()#The middle line in each group of three has no amino acids
+            line2 = lines.next()
+            if len(S) == 0:
+                S = '-'*(int(line1.split()[0]) - 1) #Padding for the nterm of seq1
+            s1,s2 = line1.split()[1],line2.split()[1]
+            for aa1,aa2 in zip(s1,s2):
+                if aa1 != '-':
+                    S = S + aa2
+        self.registered_seq2 = S
+
