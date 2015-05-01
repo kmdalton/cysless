@@ -18,3 +18,4 @@ Name ideas --
     Phylogenetically Inspired Single Residue Substitutaions (PISRS)
     Phylogenetic Engineering of Residue Substitutions (PERS)
     Phylogenetically Inspired Single Site Substitutions (PISSS)
+    Single Site Substitutions from Extant Sequences (SSSExS)
