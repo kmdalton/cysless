@@ -3,5 +3,22 @@
     <title>Welcome to CysLess</title>
   </head>
   <center>
-      <p> Your sequence: {{ usersequence }} </p>
+      <div style="width:80%;word-wrap:break-word">
+          <h3> Your sequence: </h3>
+          <br>
+          <p>{{ usersequence }} </p>
+          <br>
+      </div>
+      <form method="GET" action="/userprefs">
+          <h1><u>Residues to mutate</u></h1>
+          {% for mutant in mutants %}
+          <li>Residue number:
+              <input name="{{ 'mutant' + str(mutant) }}" type="text" size=5></input>
+              <button name="{{ 'delete_mutant' + str(mutant) }}">Delete</button> 
+          </li>
+          {% end %}
+          <br>
+      <input type="button" name="add" method="GET" action="/userprefs">Add</button>
+      <input type="submit" method="POST" action=></input>
+      </form>
   </center>

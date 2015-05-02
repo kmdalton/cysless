@@ -4,7 +4,8 @@
 #                                                                             #
 ###############################################################################
 
-import urllib2,re,subprocess,requests
+import urllib2,re,subprocess,requests,datetime
+from time import sleep
 
 class ConnectivityError(Exception):
     pass
@@ -18,6 +19,7 @@ class blaster():
             self.seq = ''
         else:
             self.seq = seq
+        self.starttime = datetime.datetime.now()
         self.rid = None
         self.status = None #None=>RID not set;False=>Search in progress;True=>Search Complete
         self.numhits= None
@@ -26,13 +28,35 @@ class blaster():
         self.uids   = None
         #self.blast_request()
 
+    def full_analysis(self):
+        """
+        blaster.full_analysis()
+        makes external blast call. downloads sequence hits and makes the pairwise smith-waterman 
+        alignments between the initial seqs and the hits.
+        --------
+        Returns:
+            self (blaster object)
+        """
+        self.blast_request()
+        while self.check_status() is False:
+            sleep(20)
+        self.get_hitlist()
+        self.make_pairwise_alignments()
+        return self
+
+    def uptime(self):
+        """blaster.uptime() - return lifetime of a blaster object in seconds"""
+        return (datetime.datetime.now() - self.starttime).seconds
+
     def blast_request(self, **kw):
         """
         blaster.blast_request(**kwargs)
+            -------
             kwargs:
                 HITLIST_SIZE (str|int): max number of seqs to ask blast for, default 3000
                 DATABASE (str): which blast database to search, default nr
                 PROGRAM (str): which blast program to use, default blastp
+            --------
             returns:
                 nothing. but it sets self.numhits, self.rid
         """
@@ -51,9 +75,13 @@ class blaster():
         blaster.check_status()
             query the ncbi database to check the status of self.rid which is the ncbi server
             request id for the blast search initiated by self.blast_request
-            returns True if the blast search is complete, False otherwise, and None if self.rid is unset
+        --------
+        Returns:
+            bool/None - returns True if the blast search is complete, False otherwise, and None if self.rid is unset
+                        also sets the instance variable self.status to the same value
         """
         if self.rid is None:
+            self.status = None
             return None
         else:
         #Now we check to see if the server will return formatted results
@@ -61,22 +89,11 @@ class blaster():
         #if the search is __complete__. Otherwise, we get an html waiting page
             text = ncbiGet(self.rid, ALIGNMENTS='0', DESCRIPTIONS='0', FORMAT_TYPE='Text')
             if '<!DOCTYPE html' in text.split('\n')[0]:
+                self.status = False
                 return False
             else:
+                self.status = True
                 return True
-
-    def update_status(self):
-        """
-        blaster.update_status()
-            query the qblast server with request id, self.rid
-        """
-        status = self.check_status()
-        if status is None:
-            self.status = None
-        elif status == True:
-            self.status = True
-        else:
-            self.status = False
 
     def get_hitlist(self):
         self.update_status()
@@ -242,6 +259,28 @@ def efetch(uids, **kw):
     return r.text
 
 class smith_waterman():
+    """
+    align two sequences using the smith-waterman algorithm via water of the EMBOSS suite
+
+    Parameters
+    ----------
+        seq1: an amino acid sequence to be aligned with seq2
+        seq2: an amino acid sequence
+    Class Methods
+    -------------
+        smith_waterman.align(): make an external call to the emboss suite and align seq1&2 supplied at __init__
+
+    Instance Variables
+    ------------------
+        smith_waterman.aln str is where we keep the text output from water
+        smith_waterman.seq1 is the first sequence provided at instantiation
+        smith_waterman.seq2 is the second sequence provided at instantiation
+        smith_waterman.indentity  (float) is the sequence identity calculated by water
+        smith_waterman.similarity (float) is the sequence similarity calculated by water
+        smith_waterman.registered_seq2 is the second sequence with the appropriate gap structure such that it has a 
+            1-1 correspondence with seq1, residue by residue. this may include a series of gaps at the n and/or c-terminus.
+    
+    """
     def __init__(self, seq1, seq2):
         self.seq1,self.seq2 = seq1,seq2
         self.aln,self.identity,self.similarity = None,None,None
@@ -271,5 +310,6 @@ class smith_waterman():
             for aa1,aa2 in zip(s1,s2):
                 if aa1 != '-':
                     S = S + aa2
+        S = S.ljust(len(self.seq1), '-')
         self.registered_seq2 = S
 
