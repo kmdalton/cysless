@@ -21,3 +21,7 @@ Name ideas --
     Phylogenetic Engineering of Residue Substitutions (PERS)
     Phylogenetically Inspired Single Site Substitutions (PISSS)
     Single Site Substitutions from Extant Sequences (SSSExS)
+    Point Mutants from Related Extant Sequences(PMRES)
+    Residue Substitutions from High Identity Sequences (RSHIS)
+    Site Substitutions from High Identity Sequences (SSHIS)
+

@@ -6,19 +6,23 @@
       <div style="width:80%;word-wrap:break-word">
           <h3> Your sequence: </h3>
           <br>
-          <p>{{ usersequence }} </p>
+          <p>
+          {{ highlighted_markup }}
+          </p>
           <br>
       </div>
-      <form method="GET" action="/userprefs">
+      <form method="GET" action="/sequenceprefs">
           <h1><u>Residues to mutate</u></h1>
-          {% for mutant in mutants %}
+          {% for i,mutant in enumerate(mutants) %}
           <li>Residue number:
-              <input name="{{ 'mutant' + str(mutant) }}" type="text" size=5></input>
-              <button name="{{ 'delete_mutant' + str(mutant) }}">Delete</button> 
+          <input name="mutant" type="text" size=5 value={{ "" if mutant == "0" else mutant }}>
+              <input type="submit" value="Delete" name="{{ i }}"/>
           </li>
           {% end %}
           <br>
-      <input type="button" name="add" method="GET" action="/userprefs">Add</button>
-      <input type="submit" method="POST" action=></input>
+      <input type="submit" name="add" value="Add">
+      <input type="submit" formmethod="POST" formaction="/sequenceprefs"/>
+      <input type="hidden" name="sessionid" type="text" value="{{ sessionid }}"/>
       </form>
+
   </center>
