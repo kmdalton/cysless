@@ -62,15 +62,17 @@ class PreferenceHandler(RequestHandler):
         seq = self.db[sessionid].seq
         if 'mutant' in self.request.arguments:
             mutants = self.request.arguments['mutant']
-            mutants = [i if i.isdigit() else '' for i in mutants]
+            mutants = [i if i.isdigit() and int(i) <= len(seq) and int(i) > 0 else '' for i in mutants]
         else:
-            mutants = ['']
+            mutants = []
         delete = [k for k,v in self.request.arguments.items() if v[0].lower() == 'delete']
         if len(delete) == 1:
             delete = int(delete[0])
             mutants = mutants[:delete] + mutants[delete+1:]
         if 'add' in self.request.arguments:
             mutants.append('')
+        if len(mutants) == 0:
+            mutants = ['']
         self.render('templates/userprefs.html',
                 usersequence = seq,
                 mutants=mutants,
@@ -96,8 +98,6 @@ class PreferenceHandler(RequestHandler):
             currseq = currseq[:i]
         markup = currseq + markup
         return markup
-
-
 
     def post(self):
         sessionid = int(self.get_argument("sessionid"))
