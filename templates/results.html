@@ -1,6 +1,6 @@
 <html>
   <head>
-    <title>Welcome to CysLess</title>
+    <title>Your Results</title>
   </head>
   <center>
       <div style="width:80%;word-wrap:break-word">
@@ -13,7 +13,6 @@
       </div>
       <form method="GET" action="/sequenceprefs">
           <h1><u>Residues to mutate</u></h1>
-          {% autoescape None %}
           {% for i,mutant in enumerate(mutants) %}
           <li>Residue number:
           <input name="mutant" type="text" size=5 {{ "" if mutant == "" else " readonly" }} value={{ mutant }} >

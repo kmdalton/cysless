@@ -61,24 +61,34 @@ class PreferenceHandler(RequestHandler):
         sessionid = int(self.get_argument("sessionid"))
         seq = self.db[sessionid].seq
         if 'mutant' in self.request.arguments:
-            mutants = self.request.arguments['mutant']
-            mutants = [i if i.isdigit() and int(i) <= len(seq) and int(i) > 0 else '' for i in mutants]
+            mutants = self.sanitize_mutants(self.request.arguments['mutant'], seq)
         else:
             mutants = []
-        delete = [k for k,v in self.request.arguments.items() if v[0].lower() == 'delete']
-        if len(delete) == 1:
-            delete = int(delete[0])
+        deletes = [k for k,v in self.request.arguments.items() if v[0].lower() == 'delete']
+        if len(deletes) == 1:
+            delete = int(deletes[0])
             mutants = mutants[:delete] + mutants[delete+1:]
+
         if 'add' in self.request.arguments:
             mutants.append('')
-        if len(mutants) == 0:
+
+        mutants = self.sanitize_mutants(mutants, seq)
+
+        if len(mutants) == 0: #fuckall prevent returning an empty list
             mutants = ['']
+
         self.render('templates/userprefs.html',
                 usersequence = seq,
                 mutants=mutants,
                 sessionid=sessionid,
                 highlighted_markup=self.highlight(seq, mutants)
                 )
+
+    def sanitize_mutants(self, mutant_list, sequence):
+        mutants = [i if i.isdigit() and int(i) <= len(sequence) and int(i) > 0 else '' for i in mutant_list]
+        #remove duplicated DIGITS
+        mutants = list(set([i for i in mutants if i.isdigit()])) + [i for i in mutants if not i.isdigit()]
+        return mutants
 
     def highlight(self, seq, mutants):
         #DON'T LOOK AT ME!!! I'M HIDEOUS AWWWWW!~
