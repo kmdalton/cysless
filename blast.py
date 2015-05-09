@@ -96,7 +96,7 @@ class blaster():
                 return True
 
     def get_hitlist(self):
-        self.update_status()
+        self.check_status()
         if self.status is None:
             return None,None
         elif self.status == False:
@@ -116,6 +116,24 @@ class blaster():
 
     def make_pairwise_alignments(self):
         self.alignments = [smith_waterman(self.seq, i) for i in self.seqs]
+
+    def recommend_mutant(self, residues):
+        if self.alignments is None:
+            return None
+        else:
+            WT = [self.seq[i-1] for i in residues]
+            hits = []
+            for a in self.alignments:
+                MUT = [a.registered_seq2[i-1] for i in residues]
+                if '-' not in MUT:
+                    if True not in [x == y for x,y in zip(WT,MUT)]:
+                        hits.append(a)
+            hits.sort(key = lambda x: x.identity)
+            if len(hits) > 0.:
+                return hits[-1]
+            else:
+                return None
+
 
     def __exit__(self):
         if self.rid != None:
