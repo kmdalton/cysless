@@ -26,6 +26,7 @@ class blaster():
         self.headers= None
         self.seqs   = None
         self.uids   = None
+        self.alignments = None
         #self.blast_request()
 
     def full_analysis(self):
