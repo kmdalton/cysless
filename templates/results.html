@@ -1,8 +1,10 @@
 <html>
   <head>
-    <title>Your Results</title>
+    <title>Welcome to CysLess</title>
   </head>
-  <center>
+ <center>
+      {% autoescape None %}
+      {{ message }}
       <div style="width:80%;word-wrap:break-word">
           <h3> Your sequence: </h3>
           <br>
@@ -11,18 +13,15 @@
           </p>
           <br>
       </div>
-      <form method="GET" action="/sequenceprefs">
-          <h1><u>Residues to mutate</u></h1>
+          <h1><u>Results from: {{ source_header }}</u></h1>
+          {% autoescape None %}
+          <li>Residue   Mutant</li>
           {% for i,mutant in enumerate(mutants) %}
-          <li>Residue number:
-          <input name="mutant" type="text" size=5 {{ "" if mutant == "" else " readonly" }} value={{ mutant }} >
-              <input type="submit" value="Delete" name="{{ i }}"/>
-          </li>
+          <li>{{ "{}{}\t{}".format(usersequence[int(mutant) - 1], mutant, source_seq[int(mutant)-1]) }}</li>
           {% end %}
           <br>
-      <input type="submit" name="add" value="Add">
-      <input type="submit" formmethod="POST" formaction="/sequenceprefs"/>
-      <input type="hidden" name="sessionid" type="text" value="{{ sessionid }}"/>
+      <form>
+          <a href="/sequenceprefs?sessionid={{ sessionid }}">Make a New Mutant</a>
       </form>
 
   </center>

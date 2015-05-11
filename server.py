@@ -1,19 +1,18 @@
-import re,blast
+import re,blast,pickle
 from multiprocessing import Pool,cpu_count
 from tornado.ioloop import IOLoop
 from tornado.web import RequestHandler, Application, url, asynchronous
 from tornado.gen import coroutine
 
+dummy_blaster_filename = 'dummy_blaster.pickle'
 
 
 def blaster(seq):
     b = blast.blaster(seq)
     return b.full_analysis()
 
-class infiniblaster():
-    def __init__(self):
-        pass
-    def uptime():
+class infiniblaster(blast.blaster):
+    def uptime(self):
         return 0
 
 def sanitize(seq):
@@ -46,7 +45,7 @@ class MainHandler(RequestHandler):
             self.db[k] = blast.blaster(seq) #This may cause bugs. The right thing would be to put a lock on or use a real db
             def callback(blaster_obj):
                 self.db[int(k)] = blaster_obj
-            #self.pool.apply_async(blaster, (seq,), callback=callback)
+            self.pool.apply_async(blaster, (seq,), callback=callback)
             self.redirect('/sequenceprefs?sessionid=' + str(k))
         elif not is_sane(seq):
             self.get(header="Invalid sequences. Ensure all characters are amino acids")
@@ -57,7 +56,7 @@ class PreferenceHandler(RequestHandler):
     def initialize(self, **kw):
         self.db = kw['DB']
 
-    def get(self):
+    def get(self, **kw):
         sessionid = int(self.get_argument("sessionid"))
         seq = self.db[sessionid].seq
         if 'mutant' in self.request.arguments:
@@ -77,22 +76,25 @@ class PreferenceHandler(RequestHandler):
         if len(mutants) == 0: #fuckall prevent returning an empty list
             mutants = ['']
 
+        message = kw.get('message', '')
+
         self.render('templates/userprefs.html',
                 usersequence = seq,
                 mutants=mutants,
                 sessionid=sessionid,
-                highlighted_markup=self.highlight(seq, mutants)
+                highlighted_markup=self.highlight(seq, mutants),
+                message = message, 
                 )
 
     def sanitize_mutants(self, mutant_list, sequence):
-        mutants = [i if i.isdigit() and int(i) <= len(sequence) and int(i) > 0 else '' for i in mutant_list]
+        mutants = [i if str(i).isdigit() and int(i) <= len(sequence) and int(i) > 0 else '' for i in mutant_list]
         #remove duplicated DIGITS
-        mutants = list(set([i for i in mutants if i.isdigit()])) + [i for i in mutants if not i.isdigit()]
+        mutants = list(set([i for i in mutants if str(i).isdigit()])) + [i for i in mutants if not str(i).isdigit()]
         return mutants
 
     def highlight(self, seq, mutants):
         #DON'T LOOK AT ME!!! I'M HIDEOUS AWWWWW!~
-        mutants = sorted(list(set([int(i) for i in mutants if i.isdigit()])))[::-1]
+        mutants = sorted(list(set([int(i) for i in mutants if str(i).isdigit()])))[::-1]
         mutants = [i for i in mutants if i <= len(seq)]
         print mutants
         markup = ''
@@ -109,14 +111,29 @@ class PreferenceHandler(RequestHandler):
         markup = currseq + markup
         return markup
 
-    def post(self):
+    def post(self, **kw):
         sessionid = int(self.get_argument("sessionid"))
-        seq = self.db[sessionid].seq
-        mutants = self.get_argument('mutant')
-        self.write("sessionid:{}\nseq:{}\nmutants:{}\n".format(sessionid, seq, mutants))
-        self.flush()
+        mutants = self.request.arguments['mutant']
+        if self.db[sessionid].check_status():
+            seq = self.db[sessionid].seq
+            mutants = [int(i) for i in mutants if str(i).isdigit()]
+            SW = self.db[sessionid].recommend_mutant(mutants)
+            self.render('templates/results.html',
+                    usersequence = seq,
+                    mutants=mutants,
+                    sessionid=sessionid,
+                    source_seq=SW.registered_seq2,
+                    source_header=SW.header2,
+                    highlighted_markup=self.highlight(seq, mutants),
+                    message = kw.get('message', ''),
+                    )
+        else:
+            message = '<h3> Sorry, your BLAST results are not ready yet. Please wait a minute and resubmit. </h3>'
+            self.get(message = message)
 
-RID_DB = {0:infiniblaster()}
+
+RID_DB = {0: pickle.load(open(dummy_blaster_filename))}
+print RID_DB
 
 application = Application([
     (r"/", MainHandler, {'DB': RID_DB}),

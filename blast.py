@@ -116,7 +116,7 @@ class blaster():
             self.headers,self.seqs = zip(*(('>'+i.split('\n')[0], ''.join(i.split('\n')[1:])) for i in fasta.split('>')[1:]))
 
     def make_pairwise_alignments(self):
-        self.alignments = [smith_waterman(self.seq, i) for i in self.seqs]
+        self.alignments = [smith_waterman(self.seq, hit, h2 = header) for hit,header in zip(self.seqs, self.headers)]
 
     def recommend_mutant(self, residues):
         if self.alignments is None:
@@ -300,7 +300,8 @@ class smith_waterman():
             1-1 correspondence with seq1, residue by residue. this may include a series of gaps at the n and/or c-terminus.
     
     """
-    def __init__(self, seq1, seq2):
+    def __init__(self, seq1, seq2, **kw):
+        self.header1,self.header2 = kw.get('h1', ''),kw.get('h2','')
         self.seq1,self.seq2 = seq1,seq2
         self.aln,self.identity,self.similarity = None,None,None
         self.registered_seq2 = None
