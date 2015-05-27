@@ -16,13 +16,13 @@
       <form method="GET" action="/sequenceprefs">
           <h1><u>Residues to mutate</u></h1>
           {% for i,mutant in enumerate(mutants) %}
-          <li>Residue number:
-          <input name="mutant" type="text" size=5 {{ "" if mutant == "" else " readonly" }} value={{ mutant }}>
-              <input type="submit" value="Delete" name="{{ i }}"/>
+          <li style="color: {{ 'black' if validity[i] else 'red' }}">Residue number:
+          <input name="mutant" type="text" size=5 value={{ mutant }}>
+              <input type="submit" value="-" name="{{ i }}"/>
           </li>
           {% end %}
           <br>
-      <input type="submit" name="add" value="Add">
+      <input type="submit" name="add" value="+">
       <input type="submit" formmethod="POST" formaction="/sequenceprefs"/>
       <input type="hidden" name="sessionid" type="text" value="{{ sessionid }}"/>
       </form>

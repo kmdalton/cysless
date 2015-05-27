@@ -16,9 +16,9 @@ class infiniblaster(blast.blaster):
         return 0
 
 def sanitize(seq):
-    """sanitize(str): convert fasta or bare sequence to bare sequence with no whitespace. returns a string"""
+    """sanitize(str): convert fasta or bare sequence to bare sequence with no whitespace. returns a string of upper case letters"""
     seq = u''.join([re.sub(r"^s+", "", i.strip()) for i in seq.split(u'\n') if i[0] != '>']) #In case of FASTA
-    return seq
+    return seq.upper()
 
 def is_sane(seq):
     """is_sane(str): are all characters in str.upper() amino acids, return True or False"""
@@ -58,39 +58,40 @@ class PreferenceHandler(RequestHandler):
 
     def get(self, **kw):
         sessionid = int(self.get_argument("sessionid"))
-        seq = self.db[sessionid].seq
-        if 'mutant' in self.request.arguments:
-            mutants = self.sanitize_mutants(self.request.arguments['mutant'], seq)
+        if sessionid in self.db:
+            seq = self.db[sessionid].seq
+            if 'mutant' in self.request.arguments:
+                mutants = self.request.arguments['mutant']
+            else:
+                mutants = []
+
+            #Remove mutants slated for deletion
+            deletes = [int(k) for k,v in self.request.arguments.items() if v[0].lower() == '-' and k.isdigit()]
+            if len(deletes) == 1: #must be in {0,1}
+                delete = deletes[0]
+                mutants = mutants[:delete] + mutants[delete+1:]
+
+            mutant_validity = [int(i) in range(1, len(seq)+1) if i.isdigit() else False for i in mutants]
+            if False in mutant_validity:
+                message = "<font color='firebrick'>*Invalid residue numbers detected</font>"
+            else:
+                message = kw.get('message', '')
+
+            #If '+' was clicked, add an empty mutant; also never render an empty list
+            if 'add' in self.request.arguments or len(mutants) == 0:
+                mutants.append('')
+                mutant_validity.append(True)
+
+            self.render('templates/userprefs.html',
+                    usersequence = seq,
+                    mutants=mutants,
+                    validity=mutant_validity,
+                    sessionid=sessionid,
+                    highlighted_markup=self.highlight(seq, mutants),
+                    message = message, 
+                    )
         else:
-            mutants = []
-        deletes = [k for k,v in self.request.arguments.items() if v[0].lower() == 'delete']
-        if len(deletes) == 1:
-            delete = int(deletes[0])
-            mutants = mutants[:delete] + mutants[delete+1:]
-
-        if 'add' in self.request.arguments:
-            mutants.append('')
-
-        mutants = self.sanitize_mutants(mutants, seq)
-
-        if len(mutants) == 0: #fuckall prevent returning an empty list
-            mutants = ['']
-
-        message = kw.get('message', '')
-
-        self.render('templates/userprefs.html',
-                usersequence = seq,
-                mutants=mutants,
-                sessionid=sessionid,
-                highlighted_markup=self.highlight(seq, mutants),
-                message = message, 
-                )
-
-    def sanitize_mutants(self, mutant_list, sequence):
-        mutants = [i if str(i).isdigit() and int(i) <= len(sequence) and int(i) > 0 else '' for i in mutant_list]
-        #remove duplicated DIGITS
-        mutants = list(set([i for i in mutants if str(i).isdigit()])) + [i for i in mutants if not str(i).isdigit()]
-        return mutants
+            self.render('templates/frontpage.html', header='Invalid session ID. Please enter a new sequence')
 
     def highlight(self, seq, mutants):
         #DON'T LOOK AT ME!!! I'M HIDEOUS AWWWWW!~
@@ -98,10 +99,8 @@ class PreferenceHandler(RequestHandler):
         mutants = [i for i in mutants if i <= len(seq)]
         print mutants
         markup = ''
-        #from copy import deepcopy
-        #currseq = deepcopy(seq)
         currseq = seq
-        print "Highlighter is here! To save the markup!"
+        #print "Highlighter is here! To save the markup!"
         for i in mutants:
             print currseq
             i = i-1 #zero indexing
@@ -133,7 +132,7 @@ class PreferenceHandler(RequestHandler):
 
 
 RID_DB = {0: pickle.load(open(dummy_blaster_filename))}
-print RID_DB
+#print RID_DB
 
 application = Application([
     (r"/", MainHandler, {'DB': RID_DB}),
