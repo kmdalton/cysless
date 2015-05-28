@@ -8,6 +8,9 @@ import urllib2,re,subprocess,requests,datetime
 from time import sleep
 
 class ConnectivityError(Exception):
+    """
+    This is just a dummy class to help diagnose the source of an error. It may do more later.
+    """
     pass
 
 class blaster():
@@ -119,6 +122,15 @@ class blaster():
         self.alignments = [smith_waterman(self.seq, hit, h2 = header) for hit,header in zip(self.seqs, self.headers)]
 
     def recommend_mutant(self, residues):
+        """
+        blaster.recommend_mutant(residues)
+        Parameters
+        ----------
+        residues: An iterable containing integer residue numbers to be mutated.
+        Returns
+        -------
+        smith_waterman object or None: smith_waterman object of the most closely related sequence which is mutated at the requested positions or None if no suitable sequence exists
+        """
         if self.alignments is None:
             return None
         else:

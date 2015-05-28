@@ -97,14 +97,10 @@ class PreferenceHandler(RequestHandler):
         #DON'T LOOK AT ME!!! I'M HIDEOUS AWWWWW!~
         mutants = sorted(list(set([int(i) for i in mutants if str(i).isdigit()])))[::-1]
         mutants = [i for i in mutants if i <= len(seq)]
-        print mutants
         markup = ''
         currseq = seq
-        #print "Highlighter is here! To save the markup!"
         for i in mutants:
-            print currseq
             i = i-1 #zero indexing
-            print i
             markup = u"<mark>" + currseq[i] + u"</mark>" + currseq[i+1:] + markup
             currseq = currseq[:i]
         markup = currseq + markup
@@ -116,23 +112,42 @@ class PreferenceHandler(RequestHandler):
         if self.db[sessionid].check_status():
             seq = self.db[sessionid].seq
             mutants = [int(i) for i in mutants if str(i).isdigit()]
-            SW = self.db[sessionid].recommend_mutant(mutants)
-            self.render('templates/results.html',
-                    usersequence = seq,
-                    mutants=mutants,
-                    sessionid=sessionid,
-                    source_seq=SW.registered_seq2,
-                    source_header=SW.header2,
-                    highlighted_markup=self.highlight(seq, mutants),
-                    message = kw.get('message', ''),
-                    )
+            SW = self.db[sessionid].recommend_mutant(mutants) #There may be dragons in here
+            if SW is not None:
+                self.render('templates/results.html',
+                        usersequence = seq,
+                        mutants=mutants,
+                        sessionid=sessionid,
+                        source_seq=SW.registered_seq2,
+                        source_header=SW.header2,
+                        highlighted_markup=self.highlight(seq, mutants),
+                        message = kw.get('message', ''),
+                        )
+            else:
+                message = ''
+                if len(mutants) > 1:
+                    message = '<h3> No suitable match found. Try decreasing the number of simultaneous mutations. </h3>'
+                else:
+                    message = '<h3> No suitable match found. </h3>'
+                self.render('templates/userprefs.html',
+                        usersequence = seq,
+                        mutants=mutants,
+                        sessionid=sessionid,
+                        validity = [i in range(1, len(seq)+1) for i in mutants],
+                        highlighted_markup=self.highlight(seq, mutants),
+                        message = kw.get('message', message),
+                        )
         else:
-            message = '<h3> Sorry, your BLAST results are not ready yet. Please wait a minute and resubmit. </h3>'
+            message = '<h3> Sorry, your BLAST results are not ready yet. Queries can take up to 15 minutes depending on load. Please wait several minutes and resubmit this form. </h3>'
             self.get(message = message)
 
 
-RID_DB = {0: pickle.load(open(dummy_blaster_filename))}
-#print RID_DB
+#Initialize the db with some dummy data for debugging
+RID_DB = {0: pickle.load(open(dummy_blaster_filename)),
+          1: pickle.load(open(dummy_blaster_filename)),
+          }
+RID_DB[0].check_status = lambda: False #Debug unfinished queries
+RID_DB[1].check_status = lambda: True  #Debug completed queries
 
 application = Application([
     (r"/", MainHandler, {'DB': RID_DB}),
