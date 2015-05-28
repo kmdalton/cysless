@@ -11,10 +11,6 @@ def blaster(seq):
     b = blast.blaster(seq)
     return b.full_analysis()
 
-class infiniblaster(blast.blaster):
-    def uptime(self):
-        return 0
-
 def sanitize(seq):
     """sanitize(str): convert fasta or bare sequence to bare sequence with no whitespace. returns a string of upper case letters"""
     seq = u''.join([re.sub(r"^s+", "", i.strip()) for i in seq.split(u'\n') if i[0] != '>']) #In case of FASTA
@@ -148,6 +144,9 @@ RID_DB = {0: pickle.load(open(dummy_blaster_filename)),
           }
 RID_DB[0].check_status = lambda: False #Debug unfinished queries
 RID_DB[1].check_status = lambda: True  #Debug completed queries
+
+RID_DB[0].uptime = lambda: 0
+RID_DB[1].uptime = lambda: 0
 
 application = Application([
     (r"/", MainHandler, {'DB': RID_DB}),
