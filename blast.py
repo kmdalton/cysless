@@ -5,6 +5,7 @@
 ###############################################################################
 
 import urllib2,re,subprocess,requests,datetime
+from BeautifulSoup import BeautifulStoneSoup
 from time import sleep
 
 class ConnectivityError(Exception):
@@ -106,10 +107,9 @@ class blaster():
         elif self.status == False:
             return None,None
         elif self.status == True:
-            text = ncbiGet(self.rid, ALIGNMENTS='0', DESCRIPTIONS='{}'.format(self.numhits), FORMAT_TYPE='Text')
-            self.uids = [i.split('|')[1] for i in text.split('\n') if '|' in i and len(i.split('|')) == 3]
-            self.uids = [i for i in self.uids if len(i)>3]#Shameful hack ... TODO Fix later
-            self.fetch_sequences()
+            text = ncbiGet(self.rid, ALIGNMENTS='0', DESCRIPTIONS='{}'.format(self.numhits), FORMAT_TYPE='XML')
+            soup = BeautifulStoneSoup(text)
+            self.uids = [i.hit_accession.text for i in soup.findAll('hit')]
         else:
             raise TypeError('The type of blaster.status must be True,False, or None. Current type is: {}'.format(type(self.status)))
 
