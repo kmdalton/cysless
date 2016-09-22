@@ -36,7 +36,7 @@ class blaster():
     def full_analysis(self):
         """
         blaster.full_analysis()
-        makes external blast call. downloads sequence hits and makes the pairwise smith-waterman 
+        makes external blast call. downloads sequence hits and makes the pairwise smith-waterman
         alignments between the initial seqs and the hits.
         --------
         Returns:
@@ -277,15 +277,13 @@ def blastFormatter(RID, **kw):
     #p = subprocess.Popen(' '.join(arguments), stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     lines = p.communicate()
     return lines
-    #lines = lines.split("\n")
-    #return lines[:-1] #The last line is empty
 
 def efetch(uids, **kw):
     kw['db'] = kw.get('db', 'protein')
     kw['rettype'] = kw.get('rettype', 'fasta')
     kw['retmode'] = kw.get('retmode', 'text')
     kw['id'] = ','.join(uids)
-    BaseURL = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi" 
+    BaseURL = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
     r = requests.post(BaseURL, data=kw)
     return r.text
 
@@ -308,9 +306,8 @@ class smith_waterman():
         smith_waterman.seq2 is the second sequence provided at instantiation
         smith_waterman.indentity  (float) is the sequence identity calculated by water
         smith_waterman.similarity (float) is the sequence similarity calculated by water
-        smith_waterman.registered_seq2 is the second sequence with the appropriate gap structure such that it has a 
+        smith_waterman.registered_seq2 is the second sequence with the appropriate gap structure such that it has a
             1-1 correspondence with seq1, residue by residue. this may include a series of gaps at the n and/or c-terminus.
-    
     """
     def __init__(self, seq1, seq2, **kw):
         self.header1,self.header2 = kw.get('h1', ''),kw.get('h2','')
@@ -344,4 +341,3 @@ class smith_waterman():
                     S = S + aa2
         S = S.ljust(len(self.seq1), '-')
         self.registered_seq2 = S
-
