@@ -33,22 +33,6 @@ class blaster():
         self.alignments = None
         #self.blast_request()
 
-    def full_analysis(self):
-        """
-        blaster.full_analysis()
-        makes external blast call. downloads sequence hits and makes the pairwise smith-waterman
-        alignments between the initial seqs and the hits.
-        --------
-        Returns:
-            self (blaster object)
-        """
-        self.blast_request()
-        while self.check_status() is False:
-            sleep(20)
-        self.get_hitlist()
-        self.make_pairwise_alignments()
-        return self
-
     def uptime(self):
         """blaster.uptime() - return lifetime of a blaster object in seconds"""
         return (datetime.datetime.now() - self.starttime).seconds
@@ -66,7 +50,7 @@ class blaster():
                 nothing. but it sets self.numhits, self.rid
         """
         #Make sure default list of parameters is populated
-        kw['HITLIST_SIZE'] = str(kw.get('HITLIST_SIZE', 3000))
+        kw['HITLIST_SIZE'] = str(kw.get('HITLIST_SIZE', 20000))
         kw['DATABASE'] = kw.get('DATABASE', 'nr')
         kw['PROGRAM'] = kw.get('PROGRAM', 'blastp')
         try:
@@ -107,19 +91,22 @@ class blaster():
         elif self.status == False:
             return None,None
         elif self.status == True:
-            text = ncbiGet(self.rid, ALIGNMENTS='0', DESCRIPTIONS='{}'.format(self.numhits), FORMAT_TYPE='XML')
+            text = ncbiGet(self.rid, DESCRIPTIONS='{}'.format(self.numhits), FORMAT_TYPE='XML')
             soup = BeautifulStoneSoup(text)
             self.uids = [i.hit_accession.text for i in soup.findAll('hit')]
         else:
             raise TypeError('The type of blaster.status must be True,False, or None. Current type is: {}'.format(type(self.status)))
 
-    def fetch_sequences(self):
+    def fetch_full_sequences(self):
+        """
+        blaster.fetch_full_sequences()
+        If blaster.uids is not None, download the full sequence of every uid and store it in blaster.seqs
+        You should probably not use this unless you're desperate. 
+        
+        """
         if self.uids is not None:
             fasta= efetch(self.uids) #flat text fasta format is the default for efetch
             self.headers,self.seqs = zip(*(('>'+i.split('\n')[0], ''.join(i.split('\n')[1:])) for i in fasta.split('>')[1:]))
-
-    def make_pairwise_alignments(self):
-        self.alignments = [smith_waterman(self.seq, hit, h2 = header) for hit,header in zip(self.seqs, self.headers)]
 
     def recommend_mutant(self, residues):
         """
