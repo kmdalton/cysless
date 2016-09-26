@@ -5,6 +5,15 @@ from tornado.web import RequestHandler, Application, url, asynchronous
 from tornado.gen import coroutine
 
 dummy_blaster_filename = 'dummy_blaster.pickle'
+blast_polling_period = 60 #Number of seconds to wait between blast queries
+
+def blast_search(seq):
+    b = blast.blast_handle(seq)
+    RID, WAITTIME = b.blast_request()
+    sleep(WAITTIME)
+    while not b.check_status():
+        sleep(blast_polling_period)
+    return b.fetch_result()
 
 
 def blaster(seq):
