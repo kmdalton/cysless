@@ -152,141 +152,34 @@ class blast_handle():
             URL = urllib2.urlopen(BaseURL + "RID=%s" %RID)
             URL.read()
 
-class alignment():
+class blast_results():
     """
+    Turn the BLAST XML dump into a more useable object
     """
     def __init__(self, XML):
         """
-        """
-        pass
-    def 
-
-
-
-class legacy_blast_handle():
-    """
-    blast_handle(seq, **kwargs)
-
-    This class wraps a variety of calls the NCBI
-    BLAST common url api (https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=DeveloperInfo) 
-    and
-    NCBI eutils (https://www.ncbi.nlm.nih.gov/books/NBK25501/). 
-
-    It can be used to perform a BLAST search and to retrieve the full sequences of the hits.
-    """
-    def __init__(self, seq):
-        """Create blast handle with a query sequence
-
         Parameters
         ----------
-        seq : string
-            the query sequence for your blast search
+        XML : str
+            The XML formatted BLAST results
         """
-        self.seq     = seq
-        self.rid     = None
-        self.seqs    = None
-        self.uids    = None
-        self.soup    = None 
-        self.status  = None
-        self.numhits = None
+        soup = BeautifulStoneSoup(XML)
+        query_length = int(soup.find("iteration_query-len").text)
+        self.hits = sorted([blast_hit(str(hit), query_length) for hit in soup.findAll('hit')], key = lambda x: -x.score)
+        self.uids = [i.accession for i in self.hits]
+        #Add the aligned hit sequences to self.seqs
 
-    def uptime(self):
-        """Check the uptime of a blast_handle instance. A server might do this to nuke old searches.
-        This relies on the datetime library, and is not intended to be particularly portable
-
-        Returns
-        -------
-        int
-            the number of seconds since the blast_handle was instantiated
+    def recommend_mutant(self, residues):
         """
-        return (datetime.datetime.now() - self.starttime).seconds
-
-    def blast_request(self, **kw):
-        """
-        Submit your query sequence to the BLAST server. This will set two instance variables:
-            self.numhits -- the requested HITLIST_SIZE for the the search
-            self.rid -- request ID from the BLAST server
-
         Parameters
         ----------
-        **kwargs
-
-        Keyword Arguments
-        -----------------
-        HITLIST_SIZE : int=3000
-            max number of seqs to ask blast for
-        DATABASE : str='nr'
-            which blast database to search
-        PROGRAM : str='blastp' 
-            which blast program to use, default blastp
+        residues : iterable
+            The residue numbers (type int) that you wish to mutate
         """
-        #Make sure default list of parameters is populated
-        kw['HITLIST_SIZE'] = str(kw.get('HITLIST_SIZE', 20000))
-        kw['DATABASE'] = kw.get('DATABASE', 'nr')
-        kw['PROGRAM'] = kw.get('PROGRAM', 'blastp')
-        try:
-            self.rid = ncbiPut(self.seq, **kw)[0]
-        except:
-            raise ConnectivityError('Unable to reach blast server')
-        self.numhits = int(kw['HITLIST_SIZE'])
-
-    def check_status(self):
-        """
-        Query the NCBI database to check the status of self.rid which is the ncbi server
-        request id for the blast search initiated by self.blast_request()
-
-        Returns
-        -------
-            bool
-                returns True if the blast search is complete, False otherwise, and None if self.rid is unset
-                also sets the instance variable self.status to the same value
-        """
-        if self.rid is None:
-            self.status = None
-            raise TypeError('The type of self.rid is None. Run self.blast_request() before checking status.')
-        else:
-        #Now we check to see if the server will return formatted results
-        #This test relies on the idea that qblast only returns FORMAT_TYPE==XML
-        #if the search is __complete__. Otherwise, we get an html waiting page
-            text = ncbiGet(self.rid, ALIGNMENTS='0', DESCRIPTIONS='0', FORMAT_TYPE='Text')
-            if '<!DOCTYPE html' in text.split('\n')[0]:
-                self.status = False
-                return False
-            else:
-                self.status = True
-                return True
-
-    def get_hitlist(self):
-        """
-        Download the blast results and store them in self.soup as a BeautifulStoneSoup object. 
-        Store the accession numbers for the hits in self.uids (list)
-        This function requires that self.status == True
-        
-        """
-        self.check_status()
-        if self.status is None:
-            pass
-        elif self.status == False:
-            pass
-        elif self.status == True:
-            text = ncbiGet(self.rid, DESCRIPTIONS='{}'.format(self.numhits), FORMAT_TYPE='XML')
-            self.soup = sorted(BeautifulStoneSoup(text).findAll('hit'), key = lambda x: -float(x.hsp_score.text))
-            self.uids = [i.hit_accession.text for i in self.soup]
-            #Add the aligned hit sequences to self.seqs
-            self.seqs = []
-            for hit in self.soup:
-                qseq = hit.hsp_qseq.text
-                hseq = hit.hsp_hseq.text
-                #Remove query sequence gaps from the alignment
-                qseq,hseq = zip(*((i,j) for i,j in zip(qseq,hseq) if i!='-'))
-                qseq,hseq = ''.join(qseq),''.join(hseq)
-
-                #Number of gaps to pad the ends of the hit sequences
-                lpad = int(hit.find("hsp_query-from").text) - 1 
-                rpad = len(self.seq) - int(hit.find("hsp_query-to").text)
-                self.seqs.append('-'*lpad + hseq + '-'*rpad)
-        else:
-            raise TypeError('The type of blaster.status must be True,False, or None. Current type is: {}'.format(type(self.status)))
+        for hit in self.hits:
+            if False not in [hit.qseq[i-1] != hit.hseq[i-1] and hit.hseq[i-1] != '-' for i in residues]:
+                return hit
+        return None
 
     def fetch_full_sequences(self):
         """
@@ -300,161 +193,52 @@ class legacy_blast_handle():
             fasta= efetch(self.uids) #flat text fasta format is the default for efetch
             self.headers,self.seqs = zip(*(('>'+i.split('\n')[0], ''.join(i.split('\n')[1:])) for i in fasta.split('>')[1:]))
 
-    def recommend_mutant(self, residues):
+class blast_hit():
+    """
+    Create a simple object out of a blast hit's XML representation which exposes useful features. 
+    """
+    def __init__(self, XML, query_length=None):
         """
-        blaster.recommend_mutant(residues)
         Parameters
         ----------
-        residues: An iterable containing integer residue numbers to be mutated.
-        Returns
-        -------
-        smith_waterman object or None: smith_waterman object of the most closely related sequence which is mutated at the requested positions or None if no suitable sequence exists
+        XML : str
+            The XML corresponding to a single blast hit
         """
-        if self.seqs is None:
-            return None
-        else:
-            WT = [self.seq[i-1] for i in residues]
-            hits = []
-            for hseq in self.seqs:
-                MUT = [hseq[i-1] for i in residues]
-                if '-' not in MUT:
-                    if True not in [x == y for x,y in zip(WT,MUT)]:
-                        hits.append(hseq)
-            if len(hits) > 0.:
-                return hits[0]
-            else:
-                return None
+        self.soup  = BeautifulStoneSoup(XML)
+        self.score = float(self.soup.hsp_score.text)
+        self.accession = self.soup.hit_accession.text
 
+        qseq = self.soup.hsp_qseq.text
+        hseq = self.soup.hsp_hseq.text
+        #Remove query sequence gaps from the alignment
+        qseq,hseq = zip(*((i,j) for i,j in zip(qseq,hseq) if i!='-'))
+        qseq,hseq = ''.join(qseq),''.join(hseq)
 
-    def __exit__(self):
-        if self.rid != None:
-            ncbiDelete(self.rid)
+        #Number of gaps to pad the ends of the hit sequences
+        lpad = int(self.soup.find("hsp_query-from").text) - 1 
 
-def ncbiPut(seq, **kw):
-    """
-    webBlast(seq, **kwargs)
-        Make a call to the ncbi webserver to run BLAST.
+        rpad = 0
+        if query_length is not None:
+            rpad = query_length - int(self.soup.find("hsp_query-to").text)
+        
+        self.qseq = '-'*lpad + qseq + '-'*rpad
+        self.hseq = '-'*lpad + hseq + '-'*rpad
 
-    Parameters
-    ----------
-    seq : Input protein or nucleic acid sequence
+    def __str__(self):
+       text = "Accession: {}\n{}\n".format(self.accession, self.soup.hit_def.text)
+       text = text + format_alignment(self.qseq, self.hseq)
+       return text
 
-    kwargs : { AUTO_FORMAT, COMPOSITION_BASED_STATISTICS, DATABASE, DB_GENETIC_CODE, ENDPOINTS, ENTREZ_QUERY, EXPECT, FILTER, GAPCOSTS, GENETIC_CODE, HITLIST_SIZE, I_THRESH, LAYOUT, LCASE_MASK, MATRIX_NAME, NUCL_PENALTY, NUCL_REWARD, OTHER_ADVANCED, PERC_IDENT, PHI_PATTERN, PROGRAM, QUERY, QUERY_FILE, QUERY_BELIEVE_DEFLINE, QUERY_FROM, QUERY_TO, SEARCHSP_EFF, SERVICE, THRESHOLD, UNGAPPED_ALIGNMENT, WORD_SIZE }
-    
-        kwargs are verbatim those supported by the blast REST API with CMD=Put. The values will default to a vanilla blastp search which returns fasta formatted sequences with gids for headers. (http://www.ncbi.nlm.nih.gov/blast/Doc/node5.html)
-
-    Returns
-    -------
-    Tuple (RID\string, WAITTIME\int) 
-        RID: blast request ID (RID) which will be used to retrieve the results later with a Get request
-        WAITTIME: blast returns an estimate of the amount of time in seconds the search will take
-    """
-    BaseURL = "http://www.ncbi.nlm.nih.gov/blast/Blast.cgi?CMD=Put&"
-    PutKwargs = ['AUTO_FORMAT',
-                'COMPOSITION_BASED_STATISTICS',
-                'DATABASE',
-                'DB_GENETIC_CODE',
-                'ENDPOINTS',
-                'ENTREZ_QUERY',
-                'EXPECT',
-                'FILTER',
-                'GAPCOSTS',
-                'GENETIC_CODE',
-                'HITLIST_SIZE',
-                'I_THRESH',
-                'LAYOUT',
-                'LCASE_MASK',
-                'MATRIX_NAME',
-                'NUCL_PENALTY',
-                'NUCL_REWARD',
-                'OTHER_ADVANCED',
-                'PERC_IDENT',
-                'PHI_PATTERN',
-                'PROGRAM',
-                'QUERY',
-                'QUERY_FILE',
-                'QUERY_BELIEVE_DEFLINE',
-                'QUERY_FROM',
-                'QUERY_TO',
-                'SEARCHSP_EFF',
-                'SERVICE',
-                'THRESHOLD',
-                'UNGAPPED_ALIGNMENT',
-                'WORD_SIZE'
-                ]
-    kw['QUERY'] = seq
-    kw['HITLIST_SIZE'] = kw.get('HITLIST_SIZE', 20000)
-    kw['DATABASE'] = kw.get('DATABASE', 'nr')
-    kw['PROGRAM'] = kw.get('PROGRAM', 'blastp')
-
-    QueryString = '&'.join(['='.join((i, str(kw[i]))) for i in PutKwargs if i in kw])
-    
-    U  = urllib2.urlopen(BaseURL + QueryString)
-    html = U.read()
-    QBlastInfo = re.search(r"\<\!\-\-QBlastInfoBegin.+QBlastInfoEnd", html, re.DOTALL)
-    QBlastInfo = QBlastInfo.group()
-    RID        = QBlastInfo.split()[3]
-    WAITTIME   = QBlastInfo.split()[6]
-    try:
-        WAITTIME = int(WAITTIME)
-    except ValueError:
-        print "Warning, invalid wait time returned by blast"
-
-    return RID, WAITTIME
-
-def ncbiGet(RID, **kw):
-    """
-    make an ncbi get request
-
-    Parameters
-    ----------
-    RID : the request ID you wish to query blast about
-    kwargs : { ALIGNMENTS, ALIGNMENT_VIEW, DESCRIPTIONS, ENTREZ_LINKS_NEW_WINDOW, EXPECT_LOW, EXPECT_HIGH, FORMAT_ENTREZ_QUERY, FORMAT_OBJECT, FORMAT_TYPE, NCBI_GI, RID, RESULTS_FILE, SERVICE, SHOW_OVERVIEW }
-        kwargs are verbatim those supported by the blast REST API with CMD=Get. (http://www.ncbi.nlm.nih.gov/blast/Doc/node6.html)
-    """
-    BaseURL = "http://www.ncbi.nlm.nih.gov/blast/Blast.cgi?CMD=Get&"
-    GetKwargs = ['ALIGNMENTS',
-                 'ALIGNMENT_VIEW',
-                 'DESCRIPTIONS',
-                 'ENTREZ_LINKS_NEW_WINDOW',
-                 'EXPECT_LOW',
-                 'EXPECT_HIGH',
-                 'FORMAT_ENTREZ_QUERY',
-                 'FORMAT_OBJECT',
-                 'FORMAT_TYPE',
-                 'NCBI_GI',
-                 'RID',
-                 'RESULTS_FILE',
-                 'SERVICE',
-                 'SHOW_OVERVIEW'
-                ]
-    kw['RID'] = str(RID)
-    QueryString = '&'.join(['='.join((i, str(kw[i]))) for i in GetKwargs if i in kw])
-    #print BaseURL + QueryString
-    URL = urllib2.urlopen(BaseURL + QueryString)
-    return URL.read()
-
-
-def ncbiDelete(RID):
-    """
-    delete a qblast RID from NCBI's servers
-
-    Parameters
-    ----------
-    RID : the request ID you wish to delete
-    """
-    BaseURL = "http://www.ncbi.nlm.nih.gov/blast/Blast.cgi?CMD=Delete&"
-    URL = urllib2.urlopen(BaseURL + "RID=%s" %RID)
-    URL.read()
-
-def efetch(uids, **kw):
-    kw['db'] = kw.get('db', 'protein')
-    kw['rettype'] = kw.get('rettype', 'fasta')
-    kw['retmode'] = kw.get('retmode', 'text')
-    kw['id'] = ','.join(uids)
-    BaseURL = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
-    r = requests.post(BaseURL, data=kw)
-    return r.text
+class efetch():
+    def __init__(uids, **kw):
+        self.kwargs = kw
+        self.kwargs['db'] = kw.get('db', 'protein')
+        self.kwargs['rettype'] = kw.get('rettype', 'fasta')
+        self.kwargs['retmode'] = kw.get('retmode', 'text')
+        self.kwargs['id'] = ','.join(uids)
+        BaseURL = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+        r = requests.post(BaseURL, data=kw)
+        return r.text
 
 class smith_waterman():
     """
@@ -510,3 +294,38 @@ class smith_waterman():
                     S = S + aa2
         S = S.ljust(len(self.seq1), '-')
         self.registered_seq2 = S
+
+def format_alignment(seq1, seq2, width=50):
+    """
+    Parameters
+    ----------
+    seq1 : str
+        First aligned sequence
+    seq2 : str
+        Second aligned sequence
+    width : int=50
+        Optionaly specify the number of residues per line to print
+    Returns
+    -------
+    text : str
+        The multiline formatted alignment text
+    """
+    text = ''
+    l1,l2,l3 = '','',''
+
+    for i,(res1,res2) in enumerate(zip(seq1, seq2), 1):
+        l1 += res1
+        l3 += res2
+        if res1 == res2:
+            l2 += "|"
+        else:
+            l2 += ":"
+        if i%width == 0 or i==len(seq1):
+            l1 += " {}\n".format(i)
+            l2 += "\n"
+            l3 += " {}\n\n".format(i)
+            text += l1 + l2 + l3
+            l1, l2, l3 = '','',''
+
+    return text
+

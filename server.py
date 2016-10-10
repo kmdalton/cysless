@@ -5,20 +5,7 @@ from tornado.web import RequestHandler, Application, url, asynchronous
 from tornado.gen import coroutine
 
 dummy_blaster_filename = 'dummy_blaster.pickle'
-blast_polling_period = 60 #Number of seconds to wait between blast queries
-
-def blast_search(seq):
-    b = blast.blast_handle(seq)
-    RID, WAITTIME = b.blast_request()
-    sleep(WAITTIME)
-    while not b.check_status():
-        sleep(blast_polling_period)
-    return b.fetch_result()
-
-
-def blaster(seq):
-    b = blast.blaster(seq)
-    return b.full_analysis()
+blast_polling_period = 60 #Number of seconds to wait between blast queries -- minimum sixty seconds according to the blast docs
 
 def sanitize(seq):
     """sanitize(str): convert fasta or bare sequence to bare sequence with no whitespace. returns a string of upper case letters"""
@@ -46,16 +33,21 @@ class MainHandler(RequestHandler):
         seq = self.get_argument("usersequence")
         seq = sanitize(seq)
         if is_sane(seq):
-            k  = max(self.db.keys()) + 1
-            self.db[k] = blast.blaster(seq) #This may cause bugs. The right thing would be to put a lock on or use a real db
-            def callback(blaster_obj):
-                self.db[int(k)] = blaster_obj
-            self.pool.apply_async(blaster, (seq,), callback=callback)
-            self.redirect('/sequenceprefs?sessionid=' + str(k))
+            h = blast.blast_handle(seq)
+            rid, waittime = h.request()
         elif not is_sane(seq):
-            self.get(header="Invalid sequences. Ensure all characters are amino acids")
+            self.get(header="Invalid sequence. Ensure all characters are amino acids")
         else:
             self.get()
+
+class BlastHandler(RequestHandler):
+    def get(self, rid):
+        handle = blast.blast_handle()
+        handle.rid = rid
+
+    def post(self)
+        sleep(blast_polling_period)
+
 
 class PreferenceHandler(RequestHandler):
     def initialize(self, **kw):
@@ -159,9 +151,14 @@ RID_DB[1].uptime = lambda: 0
 
 application = Application([
     (r"/", MainHandler, {'DB': RID_DB}),
+    (r"/blast/(.*)", BlastHandler),
     (r"/sequenceprefs", PreferenceHandler, {'DB' : RID_DB}),
 ])
 
 if __name__ == "__main__":
+    #Don't be a jerk error
+    if blast_polling_period < 60:
+        raise ValueError("blast_polling_period set to {}. This must be at least sixty seconds to comply with the BLAST terms of service".format(blast_polling_period))
+
     application.listen(8888)
     IOLoop.instance().start()
