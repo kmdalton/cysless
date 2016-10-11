@@ -1,14 +1,17 @@
-import re,blast,pickle
-from time import sleep
-from multiprocessing import Pool,cpu_count
+import re,blast
+import redis
+from uuid import uuid4
+from BeautifulSoup import BeautifulStoneSoup
+from time import sleep,time
 from tornado.ioloop import IOLoop
-from tornado.web import RequestHandler, Application, url, asynchronous
-from tornado.gen import coroutine
+from tornado import gen
+from tornado.web import RequestHandler, Application, asynchronous
 
 blast_polling_period = 60 #Number of seconds to wait between blast queries -- minimum sixty seconds according to the blast docs
 blast_rid_lifetime = 24*60*60 #Cache results for 24 hours -- blast says it caches for approximately 36 hours fwiw
 redis_url  = "localhost"
 redis_port = 6379
+numhits = 100 #Number of blast hits to ask for. During production this should be 20000
 
 def sanitize(seq):
     """sanitize(str): convert fasta or bare sequence to bare sequence with no whitespace. returns a string of upper case letters"""
@@ -35,9 +38,18 @@ class MainHandler(RequestHandler):
         seq = sanitize(seq)
         if is_sane(seq):
             h = blast.blast_handle(seq)
-            rid, waittime = h.request()
-            self.db[rid] = "PROVISIONAL str(waittime)" #I think we need to maintain some state here to not be evil
-            self.redirect("/blast/{}".format(rid))
+            rid, waittime = h.request(HITLIST_SIZE = numhits)
+            value = """<status>provisional</status>
+            <waittime>{}</waittime>
+            <uptime>{}</uptime>
+            <rid>{}</rid>
+            <sequence>{}</sequence>""".format(waittime, time(), rid, seq)
+
+            uid = uuid4()
+            while uid in self.db:
+                uid = uuid4()
+            self.db.setex(uid, value, blast_rid_lifetime) #I think we need to maintain some state here to not be evil
+            self.redirect("/blast/{}".format(uid))
         elif not is_sane(seq):
             self.get(header="Invalid sequence. Ensure all characters are amino acids")
         else:
@@ -47,26 +59,44 @@ class BlastHandler(RequestHandler):
     def initialize(self, **kw):
         self.db = kw['DB']
 
-    def get(self, rid):
-        if rid in self.db:
-            self.redirect("/sequence/{}".format(rid))
-            handle = blast.blast_handle()
-            handle.rid = rid
-            if handle.check_status() != True:
-                sleep(blast_polling_period)
-                self.get(rid)
-            elif handle.check_status == True:
-                xml = handle.
+    @gen.coroutine
+    def get(self, uid):
+        if uid in self.db:
+            soup = BeautifulStoneSoup(self.db[uid])
+            if soup.status is not None:
+                rid = soup.rid.text
+                handle = blast.blast_handle(soup.sequence.text)
+                handle.rid = rid
+                uptime = float(soup.uptime.text)
+                yield gen.sleep(blast_polling_period)
+                if time() - uptime > blast_polling_period:
+                    print "Checking status for UID: {}".format(uid)
+                    status = handle.check_status()
+                    print "Status {} for UID: {}".format(status, uid)
+                    if status == True:
+                        self.db[uid] = handle.fetch_result() + "\n<sequence>{}</sequence>".format(soup.sequence.text)
+                        self.redirect("/sequence/{}".format(uid))
+                    elif status == False:
+                        soup.uptime.string = str(time())
+                        self.db[uid] = str(soup)
+                        self.redirect("/blast/{}".format(uid))
+                    else:
+                        raise TypeError("blast_handle.check_status returned a variable of type: {}".format(type(status)))
+                else:
+                    self.get(uid)
+            else:
+                self.redirect('/sequence/{}'.format(uid))
         else:
-            self.rdirect("/")
+            self.redirect('/')
 
-    def post(self)
-        sleep(blast_polling_period)
-
-class PreferenceHandler(RequestHandler):
+class SequenceHandler(RequestHandler):
     def initialize(self, **kw):
         self.db = kw['DB']
 
+    def get(self, uid):
+        self.write("Here's a data dump for UID: {}\n{}".format(uid, self.db[uid]))
+        self.flush()
+"""
     def get(self, **kw):
         sessionid = int(self.get_argument("sessionid"))
         if sessionid in self.db:
@@ -151,6 +181,7 @@ class PreferenceHandler(RequestHandler):
         else:
             message = '<h3> Sorry, your BLAST results are not ready yet. Queries can take up to 15 minutes depending on load. Please wait several minutes and resubmit this form. </h3>'
             self.get(message = message)
+"""
 
 RID_DB = redis.Redis(host=redis_url, port=redis_port, db=0)
 RID_DB.set('debug', open('blast_results.xml').read())
@@ -158,7 +189,7 @@ RID_DB.set('debug', open('blast_results.xml').read())
 application = Application([
     (r"/", MainHandler, {'DB': RID_DB}),
     (r"/blast/(.*)", BlastHandler, {'DB': RID_DB}),
-    (r"/sequence/(.*)", PreferenceHandler, {'DB' : RID_DB}),
+    (r"/sequence/(.*)", SequenceHandler, {'DB' : RID_DB}),
 ])
 
 if __name__ == "__main__":

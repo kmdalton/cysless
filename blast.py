@@ -57,7 +57,7 @@ class blast_handle():
             The number of seconds NCBI estimates your request will take. 
         """
 
-        PutKwargs = ['AUTO_FORMAT', 'COMPOSITION_BASED_STATISTICS', 'DATABASE', 'DB_GENETIC_CODE', 'ENDPOINTS', 'ENTREZ_QUERY', 'EXPECT', 'FILTER', 'GAPCOSTS', 'GENETIC_CODE', 'HITLIST_SIZE', 'I_THRESH', 'LAYOUT', 'LCASE_MASK', 'MATRIX_NAME', 'NUCL_PENALTY', 'NUCL_REWARD', 'OTHER_ADVANCED', 'PERC_IDENT', 'PHI_PATTERN', 'PROGRAM', 'QUERY', 'QUERY_FILE', 'QUERY_BELIEVE_DEFLINE', 'QUERY_FROM', 'QUERY_TO', 'SEARCHSP_EFF', 'SERVICE', 'THRESHOLD', 'UNGAPPED_ALIGNMENT', 'WORD_SIZE']
+        PutKwargs = ['AUTO_FORMAT', 'COMPOSITION_BASED_STATISTICS', 'DATABASE', 'DB_GENETIC_CODE', 'ENDPOINTS', 'ENTREZ_QUERY', 'EXPECT', 'FILTER', 'FORMAT_TYPE', 'GAPCOSTS', 'GENETIC_CODE', 'HITLIST_SIZE', 'I_THRESH', 'LAYOUT', 'LCASE_MASK', 'MATRIX_NAME', 'NUCL_PENALTY', 'NUCL_REWARD', 'OTHER_ADVANCED', 'PERC_IDENT', 'PHI_PATTERN', 'PROGRAM', 'QUERY', 'QUERY_FILE', 'QUERY_BELIEVE_DEFLINE', 'QUERY_FROM', 'QUERY_TO', 'SEARCHSP_EFF', 'SERVICE', 'THRESHOLD', 'UNGAPPED_ALIGNMENT', 'WORD_SIZE']
 
         #Default keyword arguments
         kw['QUERY'] = kw.get("QUERY", self.query)
@@ -104,7 +104,7 @@ class blast_handle():
         #Now we check to see if the server will return formatted results
         #This test relies on the idea that qblast only returns FORMAT_TYPE==XML
         #if the search is __complete__. Otherwise, we get an html waiting page
-            text = ncbiGet(self.rid, ALIGNMENTS='0', DESCRIPTIONS='0', FORMAT_TYPE='Text')
+            text = self.ncbi_get(RID = self.rid, ALIGNMENTS='0', DESCRIPTIONS='0', FORMAT_TYPE='Text')
             if '<!DOCTYPE html' in text.split('\n')[0]:
                 self.status = False
                 return False
@@ -123,17 +123,30 @@ class blast_handle():
             documented one the NCBI github (https://ncbi.github.io/blast-cloud/dev/api.html). The default values are:
 
         """
-        BaseURL = "http://www.ncbi.nlm.nih.gov/blast/Blast.cgi?CMD=Get&"
-        GetKwargs = ['ALIGNMENTS', 'ALIGNMENT_VIEW', 'DESCRIPTIONS', 'ENTREZ_LINKS_NEW_WINDOW', 'EXPECT_LOW', 'EXPECT_HIGH', 'FORMAT_ENTREZ_QUERY', 'FORMAT_OBJECT', 'FORMAT_TYPE', 'NCBI_GI', 'RID', 'RESULTS_FILE', 'SERVICE', 'SHOW_OVERVIEW']
-
+        kw['FORMAT_TYPE'] = kw.get('FORMAT_TYPE', 'XML')
         status = self.check_status()
         if status != True:
             raise TypeError("blast_handle.check_status() = {}. Status must be True if the results are ready to be downloaded from NCBI.".format(status))
+        return self.ncbi_get(**kw)
+
+    def ncbi_get(self, **kw):
+        """
+        make an arbitrary ncbi get request
+
+        Parameters
+        ----------
+        **kwargs : optional
+            Supply keyword arguments to define the options of the BLAST GET request. The available keyword options are 
+            documented one the NCBI github (https://ncbi.github.io/blast-cloud/dev/api.html). The default values are:
+
+        """
+        BaseURL = "http://www.ncbi.nlm.nih.gov/blast/Blast.cgi?CMD=Get&"
+        GetKwargs = ['ALIGNMENTS', 'ALIGNMENT_VIEW', 'DESCRIPTIONS', 'ENTREZ_LINKS_NEW_WINDOW', 'EXPECT_LOW', 'EXPECT_HIGH', 'FORMAT_ENTREZ_QUERY', 'FORMAT_OBJECT', 'FORMAT_TYPE', 'NCBI_GI', 'RID', 'RESULTS_FILE', 'SERVICE', 'SHOW_OVERVIEW']
 
         for kwarg in kw:
             if kwarg not in GetKwargs:
                 raise TypeError("blast_handle.fetch_result got an unexpected keyword argument {}".format(kwarg))
-        kw['RID'] = str(RID)
+        kw['RID'] = kw.get('RID', self.rid)
         QueryString = '&'.join(['='.join((i, str(kw[i]))) for i in GetKwargs if i in kw])
         #print BaseURL + QueryString
         URL = urllib2.urlopen(BaseURL + QueryString)
