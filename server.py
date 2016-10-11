@@ -1,11 +1,14 @@
 import re,blast,pickle
+from time import sleep
 from multiprocessing import Pool,cpu_count
 from tornado.ioloop import IOLoop
 from tornado.web import RequestHandler, Application, url, asynchronous
 from tornado.gen import coroutine
 
-dummy_blaster_filename = 'dummy_blaster.pickle'
 blast_polling_period = 60 #Number of seconds to wait between blast queries -- minimum sixty seconds according to the blast docs
+blast_rid_lifetime = 24*60*60 #Cache results for 24 hours -- blast says it caches for approximately 36 hours fwiw
+redis_url  = "localhost"
+redis_port = 6379
 
 def sanitize(seq):
     """sanitize(str): convert fasta or bare sequence to bare sequence with no whitespace. returns a string of upper case letters"""
@@ -22,8 +25,6 @@ def is_sane(seq):
 class MainHandler(RequestHandler):
     def initialize(self, **kw):
         self.db = kw['DB']
-        NUMPROCS = cpu_count() - 1 | 1
-        self.pool = Pool(NUMPROCS)
 
     def get(self, **kw):
         header = kw.get('header', "Please enter your amino acid sequence below:")
@@ -35,19 +36,32 @@ class MainHandler(RequestHandler):
         if is_sane(seq):
             h = blast.blast_handle(seq)
             rid, waittime = h.request()
+            self.db[rid] = "PROVISIONAL str(waittime)" #I think we need to maintain some state here to not be evil
+            self.redirect("/blast/{}".format(rid))
         elif not is_sane(seq):
             self.get(header="Invalid sequence. Ensure all characters are amino acids")
         else:
             self.get()
 
 class BlastHandler(RequestHandler):
+    def initialize(self, **kw):
+        self.db = kw['DB']
+
     def get(self, rid):
-        handle = blast.blast_handle()
-        handle.rid = rid
+        if rid in self.db:
+            self.redirect("/sequence/{}".format(rid))
+            handle = blast.blast_handle()
+            handle.rid = rid
+            if handle.check_status() != True:
+                sleep(blast_polling_period)
+                self.get(rid)
+            elif handle.check_status == True:
+                xml = handle.
+        else:
+            self.rdirect("/")
 
     def post(self)
         sleep(blast_polling_period)
-
 
 class PreferenceHandler(RequestHandler):
     def initialize(self, **kw):
@@ -138,21 +152,13 @@ class PreferenceHandler(RequestHandler):
             message = '<h3> Sorry, your BLAST results are not ready yet. Queries can take up to 15 minutes depending on load. Please wait several minutes and resubmit this form. </h3>'
             self.get(message = message)
 
-
-#Initialize the db with some dummy data for debugging
-RID_DB = {0: pickle.load(open(dummy_blaster_filename)),
-          1: pickle.load(open(dummy_blaster_filename)),
-          }
-RID_DB[0].check_status = lambda: False #Debug unfinished queries
-RID_DB[1].check_status = lambda: True  #Debug completed queries
-
-RID_DB[0].uptime = lambda: 0
-RID_DB[1].uptime = lambda: 0
+RID_DB = redis.Redis(host=redis_url, port=redis_port, db=0)
+RID_DB.set('debug', open('blast_results.xml').read())
 
 application = Application([
     (r"/", MainHandler, {'DB': RID_DB}),
-    (r"/blast/(.*)", BlastHandler),
-    (r"/sequenceprefs", PreferenceHandler, {'DB' : RID_DB}),
+    (r"/blast/(.*)", BlastHandler, {'DB': RID_DB}),
+    (r"/sequence/(.*)", PreferenceHandler, {'DB' : RID_DB}),
 ])
 
 if __name__ == "__main__":
