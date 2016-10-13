@@ -176,9 +176,9 @@ class blast_results():
         XML : str
             The XML formatted BLAST results
         """
-        soup = BeautifulStoneSoup(XML)
-        query_length = int(soup.find("iteration_query-len").text)
-        self.hits = sorted([blast_hit(str(hit), query_length) for hit in soup.findAll('hit')], key = lambda x: -x.score)
+        self.soup = BeautifulStoneSoup(XML)
+        query_length = int(self.soup.find("iteration_query-len").text)
+        self.hits = sorted([blast_hit(str(hit), query_length) for hit in self.soup.findAll('hit')], key = lambda x: -x.score)
         self.uids = [i.accession for i in self.hits]
         #Add the aligned hit sequences to self.seqs
 
