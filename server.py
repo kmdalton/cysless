@@ -49,7 +49,8 @@ class MainHandler(RequestHandler):
             while uid in self.db:
                 uid = uuid4()
             self.db.setex(uid, value, blast_rid_lifetime) #I think we need to maintain some state here to not be evil
-            self.redirect("/blast/{}".format(uid))
+            #self.("/blast/{}".format(uid))
+            self.render("templates/waiting.html", uid=uid)
         elif not is_sane(seq):
             self.get(header="Invalid sequence. Ensure all characters are amino acids")
         else:
