@@ -95,94 +95,30 @@ class SequenceHandler(RequestHandler):
         self.db = kw['DB']
 
     def get(self, uid):
-        self.write("Here's a data dump for UID: {}\n{}".format(uid, self.db[uid]))
-        self.flush()
-"""
-    def get(self, **kw):
-        sessionid = int(self.get_argument("sessionid"))
-        if sessionid in self.db:
-            seq = self.db[sessionid].seq
-            if 'mutant' in self.request.arguments:
-                mutants = self.request.arguments['mutant']
+        if uid in self.db:
+            soup = BeautifulStoneSoup(self.db[uid])
+            if soup.status is None:
+                sequence = soup.sequence.text
+                self.render("templates/userprefs.html", sequence=sequence, uid=uid)
             else:
-                mutants = []
-
-            #Remove mutants slated for deletion
-            deletes = [int(k) for k,v in self.request.arguments.items() if v[0].lower() == '-' and k.isdigit()]
-            if len(deletes) == 1: #must be in {0,1}
-                delete = deletes[0]
-                mutants = mutants[:delete] + mutants[delete+1:]
-
-            mutant_validity = [int(i) in range(1, len(seq)+1) if i.isdigit() else False for i in mutants]
-            if False in mutant_validity:
-                message = "<font color='firebrick'>*Invalid residue numbers detected</font>"
-            else:
-                message = kw.get('message', '')
-
-            #If '+' was clicked, add an empty mutant; also never render an empty list
-            if 'add' in self.request.arguments or len(mutants) == 0:
-                mutants.append('')
-                mutant_validity.append(True)
-
-            self.render('templates/userprefs.html',
-                    usersequence = seq,
-                    mutants=mutants,
-                    validity=mutant_validity,
-                    sessionid=sessionid,
-                    highlighted_markup=self.highlight(seq, mutants),
-                    message = message, 
-                    )
+                self.redirect("/blast/{}".format(uid))
         else:
-            self.render('templates/frontpage.html', header='Invalid session ID. Please enter a new sequence')
+            self.redirect("/".format(uid))
 
-    def highlight(self, seq, mutants):
-        #DON'T LOOK AT ME!!! I'M HIDEOUS AWWWWW!~
-        mutants = sorted(list(set([int(i) for i in mutants if str(i).isdigit()])))[::-1]
-        mutants = [i for i in mutants if i <= len(seq)]
-        markup = ''
-        currseq = seq
-        for i in mutants:
-            i = i-1 #zero indexing
-            markup = u"<mark>" + currseq[i] + u"</mark>" + currseq[i+1:] + markup
-            currseq = currseq[:i]
-        markup = currseq + markup
-        return markup
-
-    def post(self, **kw):
-        sessionid = int(self.get_argument("sessionid"))
-        mutants = self.request.arguments['mutant']
-        if self.db[sessionid].check_status():
-            seq = self.db[sessionid].seq
-            mutants = [int(i) for i in mutants if str(i).isdigit()]
-            SW = self.db[sessionid].recommend_mutant(mutants) #There may be dragons in here
-            if SW is not None:
-                self.render('templates/results.html',
-                        usersequence = seq,
-                        mutants=mutants,
-                        sessionid=sessionid,
-                        source_seq=SW.registered_seq2,
-                        source_header=SW.header2,
-                        highlighted_markup=self.highlight(seq, mutants),
-                        message = kw.get('message', ''),
-                        )
+    def post(self, uid):
+        if uid in self.db:
+            print "cooking soup"
+            results = blast.blast_results(self.db[uid])
+            print "soup's on"
+            if results.soup.status is None:
+                sequence = results.soup.sequence.text
+                self.write(str(self.get_arguments('mutant')))
+                self.flush()
+                
             else:
-                message = ''
-                if len(mutants) > 1:
-                    message = '<h3> No suitable match found. Try decreasing the number of simultaneous mutations. </h3>'
-                else:
-                    message = '<h3> No suitable match found. </h3>'
-                self.render('templates/userprefs.html',
-                        usersequence = seq,
-                        mutants=mutants,
-                        sessionid=sessionid,
-                        validity = [i in range(1, len(seq)+1) for i in mutants],
-                        highlighted_markup=self.highlight(seq, mutants),
-                        message = kw.get('message', message),
-                        )
+                self.redirect("/blast/{}".format(uid))
         else:
-            message = '<h3> Sorry, your BLAST results are not ready yet. Queries can take up to 15 minutes depending on load. Please wait several minutes and resubmit this form. </h3>'
-            self.get(message = message)
-"""
+            self.redirect("/")
 
 RID_DB = redis.Redis(host=redis_url, port=redis_port, db=0)
 RID_DB.set('debug', open('blast_results.xml').read())

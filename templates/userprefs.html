@@ -1,30 +1,18 @@
 <html>
   <head>
-    <title>Your Results</title>
+    <title>Select Residues to Mutate</title>
   </head>
   <center>
       {% autoescape None %}
-      <div style="width:80%;word-wrap:break-word">
-          {{ message }}
-          <h3> Your sequence: </h3>
-          <br>
-          <p>
-          {{ highlighted_markup }}
-          </p>
-          <br>
-      </div>
-      <form method="GET" action="/sequenceprefs">
-          <h1><u>Residues to mutate</u></h1>
-          {% for i,mutant in enumerate(mutants) %}
-          <li style="color: {{ 'black' if validity[i] else 'red' }}">Residue number:
-          <input name="mutant" type="text" size=5 value={{ mutant }}>
-              <input type="submit" value="-" name="{{ i }}"/>
+      <form method="POST" action="/sequence/{{ uid }}">
+          <h3><u>Residues to mutate</u></h3>
+          {% for i,residue in enumerate(sequence, 1) %}
+          <input type="checkbox" name="mutant" value="{{ str(i) }}">{{ str(i) + residue}}</input><br>
           </li>
           {% end %}
+          <input type="hidden" name="uid" value="{{ uid }}"/>
+          <input type="hidden" name="sequence" value="{{ sequence }}"/>
           <br>
-      <input type="submit" name="add" value="+">
-      <input type="submit" formmethod="POST" formaction="/sequenceprefs"/>
-      <input type="hidden" name="sessionid" type="text" value="{{ sessionid }}"/>
+      <input type="submit"/>
       </form>
-
   </center>
