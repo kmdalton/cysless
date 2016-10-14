@@ -8,7 +8,6 @@
           <h3><u>Residues to mutate</u></h3>
           {% for i,residue in enumerate(sequence, 1) %}
           <input type="checkbox" name="mutant" value="{{ str(i) }}">{{ str(i) + residue}}</input><br>
-          </li>
           {% end %}
           <input type="hidden" name="uid" value="{{ uid }}"/>
           <input type="hidden" name="sequence" value="{{ sequence }}"/>

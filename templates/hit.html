@@ -1,0 +1,14 @@
+<html>
+
+<h3>Recommended mutant:</h3>
+{% autoescape None %}
+{% for mutant in mutants %}
+<li>{{ hit.qseq[int(mutant) - 1] + str(mutant) + hit.hseq[int(mutant) - 1] }}</li>
+{% end %}
+
+<h3>Source Sequence:</h3>
+<p style="font-family:Courier New;">
+{{ ''.join([i if i!='\n' else '<br>' for i in str(hit)]) }}
+</p>
+
+<a href="/sequence/{{ uid }}">Try a different mutant</a>

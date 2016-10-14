@@ -107,16 +107,19 @@ class SequenceHandler(RequestHandler):
 
     def post(self, uid):
         if uid in self.db:
-            print "cooking soup"
+            #print "cooking soup"
             results = blast.blast_results(self.db[uid])
-            print "soup's on"
+            #print "soup's on"
             if results.soup.status is None:
                 try:
                     mutants = self.get_arguments('mutant')
                     mutants = map(int, mutants)
                     hit = results.recommend_mutant(mutants)
-                    self.write(str(hit))
-                    self.flush()
+                    print hit
+                    print type(hit)
+                    if hit is None:
+                        self.render("templates/nohit.html")
+                    self.render("templates/hit.html", hit=hit, mutants=mutants, uid=uid)
                 except:
                     self.redirect("/sequence/{}".format(uid))
                 
