@@ -111,9 +111,14 @@ class SequenceHandler(RequestHandler):
             results = blast.blast_results(self.db[uid])
             print "soup's on"
             if results.soup.status is None:
-                sequence = results.soup.sequence.text
-                self.write(str(self.get_arguments('mutant')))
-                self.flush()
+                try:
+                    mutants = self.get_arguments('mutant')
+                    mutants = map(int, mutants)
+                    hit = results.recommend_mutant(mutants)
+                    self.write(str(hit))
+                    self.flush()
+                except:
+                    self.redirect("/sequence/{}".format(uid))
                 
             else:
                 self.redirect("/blast/{}".format(uid))
