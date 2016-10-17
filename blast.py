@@ -7,6 +7,9 @@
 import urllib2,re,subprocess,requests,datetime
 from BeautifulSoup import BeautifulStoneSoup
 
+AminoAcids = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y', 
+              'a', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'k', 'l', 'm', 'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'y']
+
 class ConnectivityError(Exception):
     """
     This is just a dummy class to help diagnose the source of an error. It may do more later.
@@ -190,7 +193,7 @@ class blast_results():
             The residue numbers (type int) that you wish to mutate
         """
         for hit in self.hits:
-            if False not in [hit.qseq[i-1] != hit.hseq[i-1] and hit.hseq[i-1] != '-' for i in residues]:
+            if False not in [hit.qseq[i-1] != hit.hseq[i-1] and hit.hseq[i-1] in AminoAcids for i in residues]:
                 return hit
         return None
 

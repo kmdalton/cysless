@@ -11,7 +11,7 @@ blast_polling_period = 60 #Number of seconds to wait between blast queries -- mi
 blast_rid_lifetime = 24*60*60 #Cache results for 24 hours -- blast says it caches for approximately 36 hours fwiw
 redis_url  = "localhost"
 redis_port = 6379
-numhits = 100 #Number of blast hits to ask for. During production this should be 20000
+numhits = 3000 #Number of blast hits to ask for. During production this should be 20000
 
 def sanitize(seq):
     """sanitize(str): convert fasta or bare sequence to bare sequence with no whitespace. returns a string of upper case letters"""

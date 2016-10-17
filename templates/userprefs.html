@@ -2,16 +2,16 @@
   <head>
     <title>Select Residues to Mutate</title>
   </head>
-  <center>
       {% autoescape None %}
       <form method="POST" action="/sequence/{{ uid }}">
+      <div style="height:80%;overflow-y: scroll;font-family:'Courier New';">
           <h3><u>Residues to mutate</u></h3>
           {% for i,residue in enumerate(sequence, 1) %}
-          <input type="checkbox" name="mutant" value="{{ str(i) }}">{{ str(i) + residue}}</input><br>
+          <input type="checkbox" name="mutant" value="{{ str(i) }}">{{ "{} {}".format(residue, i) }}</input><br>
           {% end %}
           <input type="hidden" name="uid" value="{{ uid }}"/>
           <input type="hidden" name="sequence" value="{{ sequence }}"/>
           <br>
+      </div>
       <input type="submit"/>
       </form>
-  </center>
