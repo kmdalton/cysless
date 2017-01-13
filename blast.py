@@ -87,6 +87,7 @@ class blast_handle():
         except ValueError:
             print "Warning, invalid wait time returned by blast"
 
+        self.rid = RID
         return RID, WAITTIME
 
     def check_status(self):
