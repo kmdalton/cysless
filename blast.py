@@ -185,6 +185,7 @@ class blast_results():
         self.hits = sorted([blast_hit(str(hit), query_length) for hit in self.soup.findAll('hit')], key = lambda x: -x.score)
         self.uids = [i.accession for i in self.hits]
         #Add the aligned hit sequences to self.seqs
+        self.seqs,self.headers = None, None
 
     def recommend_mutant(self, residues):
         """
@@ -246,16 +247,14 @@ class blast_hit():
        text = text + format_alignment(self.qseq, self.hseq)
        return text
 
-class efetch():
-    def __init__(uids, **kw):
-        self.kwargs = kw
-        self.kwargs['db'] = kw.get('db', 'protein')
-        self.kwargs['rettype'] = kw.get('rettype', 'fasta')
-        self.kwargs['retmode'] = kw.get('retmode', 'text')
-        self.kwargs['id'] = ','.join(uids)
-        BaseURL = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
-        r = requests.post(BaseURL, data=kw)
-        return r.text
+def efetch(uids, **kw):
+    kw['db'] = kw.get('db', 'protein')
+    kw['rettype'] = kw.get('rettype', 'fasta')
+    kw['retmode'] = kw.get('retmode', 'text')
+    kw['id'] = ','.join(uids)
+    BaseURL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+    r = requests.post(BaseURL, data=kw)
+    return r.text
 
 class smith_waterman():
     """
