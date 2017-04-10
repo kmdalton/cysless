@@ -73,7 +73,7 @@ class blast_handle():
             if kwarg not in PutKwargs:
                 raise TypeError("blast_handle.request got an unexpected keyword argument {}".format(kwarg))
 
-        BaseURL = "http://www.ncbi.nlm.nih.gov/blast/Blast.cgi?CMD=Put&"
+        BaseURL = "https://www.ncbi.nlm.nih.gov/blast/Blast.cgi?CMD=Put&"
         QueryString = '&'.join(['='.join((i, str(kw[i]))) for i in PutKwargs if i in kw])
         
         U  = urllib2.urlopen(BaseURL + QueryString)
@@ -144,7 +144,7 @@ class blast_handle():
             documented one the NCBI github (https://ncbi.github.io/blast-cloud/dev/api.html). The default values are:
 
         """
-        BaseURL = "http://www.ncbi.nlm.nih.gov/blast/Blast.cgi?CMD=Get&"
+        BaseURL = "https://www.ncbi.nlm.nih.gov/blast/Blast.cgi?CMD=Get&"
         GetKwargs = ['ALIGNMENTS', 'ALIGNMENT_VIEW', 'DESCRIPTIONS', 'ENTREZ_LINKS_NEW_WINDOW', 'EXPECT_LOW', 'EXPECT_HIGH', 'FORMAT_ENTREZ_QUERY', 'FORMAT_OBJECT', 'FORMAT_TYPE', 'NCBI_GI', 'RID', 'RESULTS_FILE', 'SERVICE', 'SHOW_OVERVIEW']
 
         for kwarg in kw:
@@ -165,7 +165,7 @@ class blast_handle():
         RID : the request ID you wish to delete
         """
         if self.rid != None:
-            BaseURL = "http://www.ncbi.nlm.nih.gov/blast/Blast.cgi?CMD=Delete&"
+            BaseURL = "https://www.ncbi.nlm.nih.gov/blast/Blast.cgi?CMD=Delete&"
             URL = urllib2.urlopen(BaseURL + "RID=%s" %RID)
             URL.read()
 
