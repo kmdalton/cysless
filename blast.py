@@ -4,7 +4,8 @@
 #                                                                             #
 ###############################################################################
 
-import urllib2,re,subprocess,requests,datetime
+import urllib2,re,subprocess,requests
+from time import time
 from BeautifulSoup import BeautifulStoneSoup
 
 AminoAcids = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y', 
@@ -32,6 +33,7 @@ class blast_handle():
         self.query  = query
         self.status = None
         self.rid    = None
+        self.last_query_time = time()
 
     def request(self, **kw):
         """
@@ -154,6 +156,7 @@ class blast_handle():
         QueryString = '&'.join(['='.join((i, str(kw[i]))) for i in GetKwargs if i in kw])
         #print BaseURL + QueryString
         URL = urllib2.urlopen(BaseURL + QueryString)
+        self.last_query_time = time()
         return URL.read()
 
     def __exit__(self):
@@ -180,9 +183,9 @@ class blast_results():
         XML : str
             The XML formatted BLAST results
         """
-        self.soup = BeautifulStoneSoup(XML)
-        query_length = int(self.soup.find("iteration_query-len").text)
-        self.hits = sorted([blast_hit(str(hit), query_length) for hit in self.soup.findAll('hit')], key = lambda x: -x.score)
+        soup = BeautifulStoneSoup(XML)
+        query_length = int(soup.find("iteration_query-len").text)
+        self.hits = sorted([blast_hit(str(hit), query_length) for hit in soup.findAll('hit')], key = lambda x: -x.score)
         self.uids = [i.accession for i in self.hits]
         #Add the aligned hit sequences to self.seqs
         self.seqs,self.headers = None, None
@@ -222,28 +225,29 @@ class blast_hit():
         XML : str
             The XML corresponding to a single blast hit
         """
-        self.soup  = BeautifulStoneSoup(XML)
-        self.score = float(self.soup.hsp_score.text)
-        self.accession = self.soup.hit_accession.text
+        soup  = BeautifulStoneSoup(XML)
+        self.score = float(soup.hsp_score.text)
+        self.accession = soup.hit_accession.text
+        self.hit_def = soup.hit_def.text
 
-        qseq = self.soup.hsp_qseq.text
-        hseq = self.soup.hsp_hseq.text
+        qseq = soup.hsp_qseq.text
+        hseq = soup.hsp_hseq.text
         #Remove query sequence gaps from the alignment
         qseq,hseq = zip(*((i,j) for i,j in zip(qseq,hseq) if i!='-'))
         qseq,hseq = ''.join(qseq),''.join(hseq)
 
         #Number of gaps to pad the ends of the hit sequences
-        lpad = int(self.soup.find("hsp_query-from").text) - 1 
+        lpad = int(soup.find("hsp_query-from").text) - 1 
 
         rpad = 0
         if query_length is not None:
-            rpad = query_length - int(self.soup.find("hsp_query-to").text)
+            rpad = query_length - int(soup.find("hsp_query-to").text)
         
         self.qseq = '-'*lpad + qseq + '-'*rpad
         self.hseq = '-'*lpad + hseq + '-'*rpad
 
     def __str__(self):
-       text = "Accession: {}\n{}\n".format(self.accession, self.soup.hit_def.text)
+       text = "Accession: {}\n{}\n".format(self.accession, self.hit_def)
        text = text + format_alignment(self.qseq, self.hseq)
        return text
 

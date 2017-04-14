@@ -1,6 +1,7 @@
 import re,blast
 import redis
 from uuid import uuid4
+from pickle import dumps,loads
 from BeautifulSoup import BeautifulStoneSoup
 from time import sleep,time
 from tornado.ioloop import IOLoop
@@ -12,6 +13,10 @@ blast_rid_lifetime = 24*60*60 #Cache results for 24 hours -- blast says it cache
 redis_url  = "localhost"
 redis_port = 6379
 numhits = 3000 #Number of blast hits to ask for. During production this should be 20000
+
+#You could put a custom serializer here if you wanted
+serialize = dumps
+unserialize = loads
 
 def sanitize(seq):
     """sanitize(str): convert fasta or bare sequence to bare sequence with no whitespace. returns a string of upper case letters"""
@@ -38,18 +43,11 @@ class MainHandler(RequestHandler):
         seq = sanitize(seq)
         if is_sane(seq):
             h = blast.blast_handle(seq)
-            rid, waittime = h.request(HITLIST_SIZE = numhits)
-            value = """<status>provisional</status>
-            <waittime>{}</waittime>
-            <uptime>{}</uptime>
-            <rid>{}</rid>
-            <sequence>{}</sequence>""".format(waittime, time(), rid, seq)
-
+            h.request()
             uid = uuid4()
             while uid in self.db:
                 uid = uuid4()
-            self.db.setex(uid, value, blast_rid_lifetime) #I think we need to maintain some state here to not be evil
-            #self.("/blast/{}".format(uid))
+            self.db.setex(uid, serialize(h), blast_rid_lifetime)
             self.render("templates/waiting.html", uid=uid)
         elif not is_sane(seq):
             self.get(header="Invalid sequence. Ensure all characters are amino acids")
@@ -63,30 +61,22 @@ class BlastHandler(RequestHandler):
     @gen.coroutine
     def get(self, uid):
         if uid in self.db:
-            soup = BeautifulStoneSoup(self.db[uid])
-            if soup.status is not None:
-                rid = soup.rid.text
-                handle = blast.blast_handle(soup.sequence.text)
-                handle.rid = rid
-                uptime = float(soup.uptime.text)
-                yield gen.sleep(blast_polling_period)
-                if time() - uptime > blast_polling_period:
+            obj = unserialize(self.db[uid])
+            if isinstance(obj, blast.blast_handle):
+                if obj.status == True:
+                    results = blast.blast_results(obj.fetch_result())
+                    self.db[uid]  = serialize(results)
+                elif time() - obj.last_query_time > blast_polling_period:
                     print "Checking status for UID: {}".format(uid)
-                    status = handle.check_status()
+                    status = obj.check_status()
                     print "Status {} for UID: {}".format(status, uid)
-                    if status == True:
-                        self.db[uid] = handle.fetch_result() + "\n<sequence>{}</sequence>".format(soup.sequence.text)
-                        self.redirect("/sequence/{}".format(uid))
-                    elif status == False:
-                        soup.uptime.string = str(time())
-                        self.db[uid] = str(soup)
-                        self.redirect("/blast/{}".format(uid))
-                    else:
-                        raise TypeError("blast_handle.check_status returned a variable of type: {}".format(type(status)))
+                    self.db[uid] = serialize(obj)
                 else:
                     self.get(uid)
-            else:
+            elif isinstance(obj, blast.blast_results):
                 self.redirect('/sequence/{}'.format(uid))
+            else:
+                self.redirect('/')
         else:
             self.redirect('/')
 
