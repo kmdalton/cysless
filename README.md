@@ -1,17 +1,17 @@
-#Rep-X
+# Rep-X
 a python webapp for designing amino acid point mutants from homology
 
 
 
 ## This software has the following dependencies:
-*python 3.6+
-*beautifulsoup4 (https://www.crummy.com/software/BeautifulSoup/bs4/doc/)
-*lxml is the preferred parser for beautifulsoup4 (https://lxml.de/)
-*requests (http://docs.python-requests.org/)
-*tornado  (http://www.tornadoweb.org/)
-*redis  (https://redis.io/)
-*water from the EMBOSS suite (http://emboss.sourceforge.net/)
-*bash: the water interface is simply a shell call wrapped by the subprocess library. i don't expect this to work on a non-unix.
+* python 3.6+
+* beautifulsoup4 (https://www.crummy.com/software/BeautifulSoup/bs4/doc/)
+* lxml is the preferred parser for beautifulsoup4 (https://lxml.de/)
+* requests (http://docs.python-requests.org/)
+* tornado  (http://www.tornadoweb.org/)
+* redis  (https://redis.io/)
+* water from the EMBOSS suite (http://emboss.sourceforge.net/)
+* bash: the water interface is simply a shell call wrapped by the subprocess library. i don't expect this to work on a non-unix.
 
 ## Installation:
 This has been tested on Anaconda Python 3.7 (https://www.anaconda.com/) on Ubuntu 18.04. Installing dependencies is easy with the conda package manager.
