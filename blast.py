@@ -4,8 +4,8 @@
 #                                                                             #
 ###############################################################################
 
-import urllib2,re,subprocess,requests,datetime
-from BeautifulSoup import BeautifulStoneSoup
+import re,subprocess,requests,datetime
+from bs4 import BeautifulSoup
 
 AminoAcids = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y', 
               'a', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'k', 'l', 'm', 'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'y']
@@ -76,8 +76,11 @@ class blast_handle():
         BaseURL = "https://www.ncbi.nlm.nih.gov/blast/Blast.cgi?CMD=Put&"
         QueryString = '&'.join(['='.join((i, str(kw[i]))) for i in PutKwargs if i in kw])
         
-        U  = urllib2.urlopen(BaseURL + QueryString)
-        html = U.read()
+        #U  = urllib3.urlopen(BaseURL + QueryString)
+        #html = U.read()
+        url = BaseURL + QueryString
+        print(url)
+        html = requests.get(url).content.decode('utf-8')
         QBlastInfo = re.search(r"\<\!\-\-QBlastInfoBegin.+QBlastInfoEnd", html, re.DOTALL)
         QBlastInfo = QBlastInfo.group()
         RID        = QBlastInfo.split()[3]
@@ -85,7 +88,7 @@ class blast_handle():
         try:
             WAITTIME = int(WAITTIME)
         except ValueError:
-            print "Warning, invalid wait time returned by blast"
+            print("Warning, invalid wait time returned by blast")
 
         self.rid = RID
         return RID, WAITTIME
@@ -152,9 +155,8 @@ class blast_handle():
                 raise TypeError("blast_handle.fetch_result got an unexpected keyword argument {}".format(kwarg))
         kw['RID'] = kw.get('RID', self.rid)
         QueryString = '&'.join(['='.join((i, str(kw[i]))) for i in GetKwargs if i in kw])
-        #print BaseURL + QueryString
-        URL = urllib2.urlopen(BaseURL + QueryString)
-        return URL.read()
+        #URL = urllib3.urlopen(BaseURL + QueryString)
+        return requests.get(BaseURL + QueryString).content.decode('utf-8')
 
     def __exit__(self):
         """
@@ -166,8 +168,9 @@ class blast_handle():
         """
         if self.rid != None:
             BaseURL = "https://www.ncbi.nlm.nih.gov/blast/Blast.cgi?CMD=Delete&"
-            URL = urllib2.urlopen(BaseURL + "RID=%s" %RID)
-            URL.read()
+            #URL = urllib3.urlopen(BaseURL + "RID=%s" %RID)
+            #URL.read()
+            requests.get(BaseURL + "RID=%s" %RID).content.decode('utf-8')
 
 class blast_results():
     """
@@ -180,7 +183,7 @@ class blast_results():
         XML : str
             The XML formatted BLAST results
         """
-        self.soup = BeautifulStoneSoup(XML)
+        self.soup = BeautifulSoup(XML, features='lxml')
         query_length = int(self.soup.find("iteration_query-len").text)
         self.hits = sorted([blast_hit(str(hit), query_length) for hit in self.soup.findAll('hit')], key = lambda x: -x.score)
         self.uids = [i.accession for i in self.hits]
@@ -222,7 +225,7 @@ class blast_hit():
         XML : str
             The XML corresponding to a single blast hit
         """
-        self.soup  = BeautifulStoneSoup(XML)
+        self.soup  = BeautifulSoup(XML, features='lxml')
         self.score = float(self.soup.hsp_score.text)
         self.accession = self.soup.hit_accession.text
 

@@ -1,4 +1,4 @@
-# Rep-X
+# REP-X
 a python webapp for designing amino acid point mutants from homology
 
 
@@ -25,7 +25,7 @@ sudo apt-get install emboss
 ```
 
 ## Running REP-X:
-Rep-x consists of two processes that need to run together. The backend is a Redis database server which is queried by the Python server. The Python servery is built with the Tornado web framework. In order to start REP-X, one must first start the Redis server by calling the redis-server command from the terminal. 
+REP-x consists of two processes that need to run together. The backend is a Redis database server which is queried by the Python server. The Python servery is built with the Tornado web framework. In order to start REP-X, one must first start the Redis server by calling the redis-server command from the terminal. 
 ```bash
 redis-server
 ```

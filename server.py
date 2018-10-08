@@ -1,7 +1,7 @@
 import re,blast
 import redis
 from uuid import uuid4
-from BeautifulSoup import BeautifulStoneSoup
+from bs4 import BeautifulSoup
 from time import sleep,time
 from tornado.ioloop import IOLoop
 from tornado import gen
@@ -63,7 +63,7 @@ class BlastHandler(RequestHandler):
     @gen.coroutine
     def get(self, uid):
         if uid in self.db:
-            soup = BeautifulStoneSoup(self.db[uid])
+            soup = BeautifulSoup(self.db[uid], features='lxml')
             if soup.status is not None:
                 rid = soup.rid.text
                 handle = blast.blast_handle(soup.sequence.text)
@@ -71,9 +71,9 @@ class BlastHandler(RequestHandler):
                 uptime = float(soup.uptime.text)
                 yield gen.sleep(blast_polling_period)
                 if time() - uptime > blast_polling_period:
-                    print "Checking status for UID: {}".format(uid)
+                    print("Checking status for UID: {}".format(uid))
                     status = handle.check_status()
-                    print "Status {} for UID: {}".format(status, uid)
+                    print("Status {} for UID: {}".format(status, uid))
                     if status == True:
                         self.db[uid] = handle.fetch_result() + "\n<sequence>{}</sequence>".format(soup.sequence.text)
                         self.redirect("/sequence/{}".format(uid))
@@ -96,7 +96,7 @@ class SequenceHandler(RequestHandler):
 
     def get(self, uid):
         if uid in self.db:
-            soup = BeautifulStoneSoup(self.db[uid])
+            soup = BeautifulSoup(self.db[uid], features='lxml')
             if soup.status is None:
                 sequence = soup.sequence.text
                 self.render("templates/userprefs.html", sequence=sequence, uid=uid)
@@ -107,16 +107,14 @@ class SequenceHandler(RequestHandler):
 
     def post(self, uid):
         if uid in self.db:
-            #print "cooking soup"
             results = blast.blast_results(self.db[uid])
-            #print "soup's on"
             if results.soup.status is None:
                 try:
                     mutants = self.get_arguments('mutant')
-                    mutants = map(int, mutants)
+                    mutants = list(map(int, mutants))
                     hit = results.recommend_mutant(mutants)
-                    print hit
-                    print type(hit)
+                    print(hit)
+                    print(type(hit))
                     if hit is None:
                         self.render("templates/nohit.html")
                     self.render("templates/hit.html", hit=hit, mutants=mutants, uid=uid)
@@ -142,5 +140,5 @@ if __name__ == "__main__":
     if blast_polling_period < 60:
         raise ValueError("blast_polling_period set to {}. This must be at least sixty seconds to comply with the BLAST terms of service".format(blast_polling_period))
 
-    application.listen(8888)
+    application.listen(8889)
     IOLoop.instance().start()
