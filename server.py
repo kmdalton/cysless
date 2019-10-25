@@ -8,7 +8,7 @@ from tornado import gen
 from tornado.web import RequestHandler, Application
 
 blast_polling_period = 60 #Number of seconds to wait between blast queries -- minimum sixty seconds according to the blast docs
-blast_rid_lifetime = 24*60*60 #Cache results for 24 hours -- blast says it caches for approximately 36 hours fwiw
+blast_rid_lifetime = 60*60 #Cache results for 24 hours -- blast says it caches for approximately 36 hours fwiw
 redis_url  = "localhost"
 redis_port = 6379
 numhits = 3000 #Number of blast hits to ask for. During production this should be 20000
@@ -45,10 +45,11 @@ class MainHandler(RequestHandler):
             <rid>{}</rid>
             <sequence>{}</sequence>""".format(waittime, time(), rid, seq)
 
-            uid = uuid4()
+            uid = str(uuid4())
             while uid in self.db:
                 uid = uuid4()
-            self.db.setex(uid, value, blast_rid_lifetime) #I think we need to maintain some state here to not be evil
+            print(uid, value, blast_rid_lifetime)
+            self.db.setex(uid, blast_rid_lifetime, value) #I think we need to maintain some state here to not be evil
             #self.("/blast/{}".format(uid))
             self.render("templates/waiting.html", uid=uid)
         elif not is_sane(seq):
@@ -126,7 +127,7 @@ class SequenceHandler(RequestHandler):
         else:
             self.redirect("/")
 
-RID_DB = redis.Redis(host=redis_url, port=redis_port, db=0)
+RID_DB = redis.StrictRedis(host=redis_url, port=redis_port, db=0)
 RID_DB.set('debug', open('blast_results.xml').read())
 
 application = Application([
