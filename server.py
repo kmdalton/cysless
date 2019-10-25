@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from time import sleep,time
 from tornado.ioloop import IOLoop
 from tornado import gen
-from tornado.web import RequestHandler, Application, asynchronous
+from tornado.web import RequestHandler, Application
 
 blast_polling_period = 60 #Number of seconds to wait between blast queries -- minimum sixty seconds according to the blast docs
 blast_rid_lifetime = 24*60*60 #Cache results for 24 hours -- blast says it caches for approximately 36 hours fwiw
