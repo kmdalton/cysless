@@ -111,13 +111,20 @@ class blast_handle():
         #Now we check to see if the server will return formatted results
         #This test relies on the idea that qblast only returns FORMAT_TYPE==XML
         #if the search is __complete__. Otherwise, we get an html waiting page
-            text = self.ncbi_get(RID = self.rid, ALIGNMENTS='0', DESCRIPTIONS='0', FORMAT_TYPE='Text')
-            if '<!DOCTYPE html' in text.split('\n')[0]:
+            text = self.ncbi_get(RID = self.rid, FORMAT_OBJECT="SearchInfo")
+            status = text.split("QBlastInfoBegin")[1].split('\n')[1].split('=')[-1]
+            print(status)
+            if status=='WAITING': 
                 self.status = False
                 return False
-            else:
+            elif status=='UNKNOWN':
+                self.status = False
+                return False
+            elif status=='READY':
                 self.status = True
                 return True
+            else:
+                raise ValueError('The status could not be determined')
 
     def fetch_result(self, **kw):
         """
@@ -131,9 +138,10 @@ class blast_handle():
 
         """
         kw['FORMAT_TYPE'] = kw.get('FORMAT_TYPE', 'XML')
-        status = self.check_status()
-        if status != True:
-            raise TypeError("blast_handle.check_status() = {}. Status must be True if the results are ready to be downloaded from NCBI.".format(status))
+        self.status = self.status if self.status==True else self.check_status()
+        if self.status != True:
+            raise ValueError("blast_handle.check_status() = {}. Status must be True if the results are ready to be downloaded from NCBI.".format(self.status))
+
         return self.ncbi_get(**kw)
 
     def ncbi_get(self, **kw):
@@ -156,6 +164,7 @@ class blast_handle():
         kw['RID'] = kw.get('RID', self.rid)
         QueryString = '&'.join(['='.join((i, str(kw[i]))) for i in GetKwargs if i in kw])
         #URL = urllib3.urlopen(BaseURL + QueryString)
+        print(BaseURL + QueryString)
         return requests.get(BaseURL + QueryString).content.decode('utf-8')
 
     def __exit__(self):
